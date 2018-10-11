@@ -9,6 +9,7 @@ import subprocess
 import argparse
 
 import github3
+import github as pygithub
 
 
 def create_repos(token, organization, assignment_path, students):
@@ -21,6 +22,11 @@ def create_repos(token, organization, assignment_path, students):
     g = github3.github.GitHubEnterprise(
         "https://github.ugent.be",
         token=token)
+
+    # Protect using the pygithub library because it's not supported with github3.py
+    pyg = pygithub.Github(
+        base_url="https://github.ugent.be/api/v3",
+        login_or_token=token)
 
     org = g.organization(organization)
 
@@ -41,6 +47,12 @@ def create_repos(token, organization, assignment_path, students):
         print(green("Protecting the master branch so students can't rewrite history"))
         master = repo.branch("master")
         master.protected = True
+
+        # Protect using the pygithub library because it's not supported with github3.py
+        pygrepo = pyg.get_repo("{}/{}".format(organization, reponame))
+        pygmaster = pygrepo.get_branch("master")
+        pygmaster.edit_protection()
+
 
 
 def grant(token, organization, students):
