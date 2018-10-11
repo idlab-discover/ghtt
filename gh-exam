@@ -8,10 +8,96 @@ import sys
 import subprocess
 import argparse
 
-from github import (
-    Github,
-    GithubException
-)
+import github3
+
+
+def create_repos(token, organization, assignment_path, students):
+    print(green("# Creating student repositories.."))
+    print(green("# Org: '{}'".format(organization)))
+    print(green("# Path: '{}'".format(assignment_path)))
+    print(green("# Students: '{}'".format(students)))
+
+    # Github Enterprise with custom hostname
+    g = github3.github.GitHubEnterprise(
+        "https://github.ugent.be",
+        token=token)
+
+    org = g.organization(organization)
+
+    for student in students:
+        print(green("\n\nPreparing repo for {}".format(student)))
+
+        reponame = get_reponame(student)
+        try:
+            repo = org.create_repository(reponame, private=True)
+        except Exception:
+            repo = g.repository(organization, reponame)
+
+        print(green("Pushing source to {}".format(repo.ssh_url)))
+        subprocess.check_call(
+            ["git", "push", repo.ssh_url], cwd=assignment_path
+        )
+
+        print(green("Protecting the master branch so students can't rewrite history"))
+        master = repo.branch("master")
+        master.protected = True
+
+
+def grant(token, organization, students):
+    print(green("# Granting students write permission to their repository.."))
+    print(green("# Org: '{}'".format(organization)))
+    print(green("# Students: '{}'".format(students)))
+
+    # Github Enterprise with custom hostname
+    g = github3.github.GitHubEnterprise(
+        "https://github.ugent.be",
+        token=token)
+
+    for student in students:
+        reponame = get_reponame(student)
+        repo = g.repository(organization, reponame)
+
+        print(green("Adding the student as collaborator"))
+        repo.add_collaborator(student)
+
+
+def remove_grant(token, organization, students):
+    print(green("# Removing students write permission to their repository.."))
+    print(green("# Org: '{}'".format(organization)))
+    print(green("# Students: '{}'".format(students)))
+
+    # Github Enterprise with custom hostname
+    g = github3.github.GitHubEnterprise(
+        "https://github.ugent.be",
+        token=token)
+
+    for student in students:
+        reponame = get_reponame(student)
+        repo = g.repository(organization, reponame)
+
+        # Delete open invitations for that user
+        # Do this before removing as collaborator so we don't get a race condition where
+        # student accepts invitation between the remove as collaborator and the remove
+        # of the invitation.
+        for invitation in repo.invitations():
+            if str(invitation.invitee) == student:
+                print(green("Removing invitation for student '{}' for repo '{}'".format(
+                    student, reponame)))
+                invitation.delete()
+
+        print(green("Removing the student '{}' as collaborator from '{}'".format(
+            student, reponame)))
+        repo.remove_collaborator(student)
+
+
+
+def green(text):
+    return "\033[1;32m{}\033[1;m".format(text)
+
+
+def get_reponame(student):
+    return "examen-{}".format(student.lower())
+
 
 def main():
     parser = argparse.ArgumentParser(description='Prepare exam repositories.')
@@ -50,80 +136,6 @@ def main():
         print("COMMAND NOT RECOGNIZED")
         exit(1)
 
-
-def create_repos(token, organization, assignment_path, students):
-    print(green("# Creating student repositories.."))
-    print(green("# Org: '{}'".format(organization)))
-    print(green("# Path: '{}'".format(assignment_path)))
-    print(green("# Students: '{}'".format(students)))
-
-    # Github Enterprise with custom hostname
-    g = Github(
-        base_url="https://github.ugent.be/api/v3",
-        login_or_token=token)
-
-    org = g.get_organization(organization)
-
-    for student in students:
-        print(green("\n\nPreparing repo for {}".format(student)))
-
-        reponame = get_reponame(student)
-        try:
-            repo = org.create_repo(reponame, private=True)
-        except GithubException as e:
-            print(e)
-        repo = g.get_repo("{}/{}".format(organization, reponame))
-
-        print(green("Pushing source to {}".format(repo.ssh_url)))
-        subprocess.check_call(
-            ["git", "push", repo.ssh_url], cwd=assignment_path
-        )
-
-        print(green("Protecting the master branch so students can't rewrite history"))
-        master = repo.get_branch("master")
-        master.edit_protection()
-
-
-def grant(token, organization, students):
-    print(green("# Granting students write permission to their repository.."))
-    print(green("# Org: '{}'".format(organization)))
-    print(green("# Students: '{}'".format(students)))
-
-    # Github Enterprise with custom hostname
-    g = Github(
-        base_url="https://github.ugent.be/api/v3",
-        login_or_token=token)
-
-    for student in students:
-        reponame = get_reponame(student)
-        repo = g.get_repo("{}/{}".format(organization, reponame))
-
-        print(green("Adding the student as collaborator"))
-        repo.add_to_collaborators(student, permission="push")
-
-def remove_grant(token, organization, students):
-    print(green("# Removing students write permission to their repository.."))
-    print(green("# Org: '{}'".format(organization)))
-    print(green("# Students: '{}'".format(students)))
-
-    # Github Enterprise with custom hostname
-    g = Github(
-        base_url="https://github.ugent.be/api/v3",
-        login_or_token=token)
-
-    for student in students:
-        reponame = get_reponame(student)
-        repo = g.get_repo("{}/{}".format(organization, reponame))
-
-        print(green("Removing the student '{}' as collaborator from '{}'".format(
-            student, reponame)))
-        repo.remove_from_collaborators(student)
-
-def green(text):
-    return "\033[1;32m{}\033[1;m".format(text)
-
-def get_reponame(student):
-    return "examen-{}".format(student.lower())
 
 if __name__ == "__main__":
     main()
