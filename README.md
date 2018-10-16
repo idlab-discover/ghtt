@@ -4,7 +4,8 @@
 2. Wanneer het examen begint geven we de studenten dan toegang tot hun repository met `gh-exam grant`.
 3. Wanneer een student klaar is geeft hij zijn papieren opgave af en verwijdert de examenbegeleider manueel de toegang van de student op de repository. Op die manier kan niemand naar buiten gaan terwijl ze nog toegang hebben tot hun repository.
 
-*`gh-exam remove-grant` kan uitgevoerd worden om alle studenten in één keer de toegang tot hun repository te ontzeggen.*
+* *`gh-exam remove-grant` kan uitgevoerd worden om alle studenten in één keer de toegang tot hun repository te ontzeggen.*
+* *Studenten [kunnen zichzelf ook verwijderen als contributor](https://help.github.com/articles/removing-yourself-from-a-collaborator-s-repository/), maar dan moeten we nog steeds manueel controleren of dat effectief gebeurd is.*
 
 Het idee is dan dat de studenten hun eigen repo clonen bij het starten van het examen. In die repo staat een Code Workspace, door die te openen starten ze visual studio code direct in de juiste map. Ze maken hun examen en als ze klaar zijn kunnen ze gewoon vanuit visual studio code pushen en zelf op github.ugent.be controleren of de juiste code er effectief staat. De master branch is beveiligd tegen een force push, ze kunnen hun geschiedenis dus niet herschrijven.
 
