@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+
+import sys
+import argparse
+
+import github3
+import requests
+
+def notify(api_key, domain_name, to, results, query):
+    url = 'https://api.mailgun.net/v3/{}/messages'.format(domain_name)
+    auth = ('api', api_key)
+
+    text = ""
+    for result in results:
+        text = text + result.html_url + "\n"
+
+    data = {
+        'from': 'gh-tools <mailgun@{}>'.format(domain_name),
+        'to': to,
+        'subject': "Alert! Repositories found who match query '{}'\n".format(query),
+        'text': text,
+    }
+
+    response = requests.post(url, auth=auth, data=data)
+    response.raise_for_status()
+
+def repos_matching(gh, query):
+    repos = set()
+    results = gh.search_code(query)
+    for result in results:
+        repos.add(result.repository)
+    return repos
+
+
+def check(token, query, url, api_key, domain_name, to):
+    print(green("# Searching for repositories.."))
+    print(green("# URL: '{}'".format(url)))
+    print(green("# Query: '{}'".format(query)))
+
+    if not url.startswith("http"):
+        url = "https://" + url
+
+    if "github.com" in url:
+        g = github3.github.GitHub(
+            token=token)
+    else:
+        g = github3.github.GitHubEnterprise(
+            url,
+            token=token)
+
+    # https://developer.github.com/v3/search/#considerations-for-code-search
+    results = repos_matching(g, query)
+    if not results:
+        print("no results")
+    for result in results:
+        print(red(result.html_url))
+
+    if results and api_key and domain_name and to:
+        print("Sending email")
+        notify(api_key, domain_name, to, results, query)
+
+
+def green(text):
+    return "\033[1;32m{}\033[1;m".format(text)
+
+def red(text):
+    return "\033[1;31m{}\033[1;m".format(text)
+
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Github tools.')
+    parser.add_argument(
+        'command',
+        help='The command to execute.'
+             '"check" creates the repositories and '
+             '"grant" grants the students rights to the already created repositories.',
+        choices=['check'])
+    parser.add_argument(
+        '-t', '--token',
+        help='Github authentication token.',
+        required='True')
+    parser.add_argument(
+        '-u', '--url',
+        help='URL to Github Enterprise instance. Defaults to github.com.',
+        default="https://github.com")
+    parser.add_argument(
+        '-q', '--query',
+        help='Query to run.\n'
+             'Examples:\n'
+             '\t"Allkit.h in:path"\n'
+             '\t"BotBerryExceptions.cpp in:path"\n'
+             'More info: https://developer.github.com/v3/search/#search-code',
+        required="True")
+    parser.add_argument(
+        '--mg-api-key',
+        dest="api_key",
+        help='Mailgun api key.')
+    parser.add_argument(
+        '--mg-domain',
+        dest="domain_name",
+        help='Mailgun domain name.')
+    parser.add_argument(
+        '--to',
+        help='Email address to send alert to.')
+    results, _ = parser.parse_known_args(sys.argv[1:])
+
+
+    if results.command == "check":
+        check(results.token,
+              results.query,
+              results.url,
+              results.api_key, results.domain_name, results.to)
+    else:
+        print("COMMAND NOT RECOGNIZED")
+        exit(1)
+
+
+if __name__ == "__main__":
+    main()
