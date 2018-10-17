@@ -42,3 +42,27 @@ This command grants each student push access to their repository in the specifie
 ```
 
 This command removes students' push access to their repository and cancels any open invitation for that student.
+
+
+# gh-tools: helper script for searching code on Github
+
+```txt
+Usage: gh-tools check [OPTIONS]
+
+  Checks to see if any repositories exist matching query, prints the
+  matching repositories and optionally sends them using Mailgun.
+
+  for more info on possible query patterns see
+  https://developer.github.com/v3/search/#search-code
+
+  Examples:
+    * `./gh-tools -t "<github-token>" -u github.ugent.be check -q "Allkit.h in:path"`
+    * `./gh-tools -t "<github-token>" -u github.ugent.be check -q "Allkit.h in:path" --mg-api-key <mailgun-api-key> --mg-domain <mailgun-url> --to <email-address>`
+
+Options:
+  -q, --query TEXT   Query to run. e.g. "Allkit.h in:path"   [required]
+  --mg-api-key TEXT  Mailgun api key.
+  --mg-domain TEXT   Mailgun domain name.
+  --to TEXT          Email address to send alert to.
+  --help             Show this message and exit.
+```
