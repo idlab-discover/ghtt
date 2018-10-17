@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 
-import sys
-import argparse
-
+import click
 import github3
 import requests
+
 
 def notify(api_key, domain_name, to, results, query):
     url = 'https://api.mailgun.net/v3/{}/messages'.format(domain_name)
@@ -24,6 +23,7 @@ def notify(api_key, domain_name, to, results, query):
     response = requests.post(url, auth=auth, data=data)
     response.raise_for_status()
 
+
 def repos_matching(gh, query):
     repos = set()
     results = gh.search_code(query)
@@ -32,89 +32,73 @@ def repos_matching(gh, query):
     return repos
 
 
-def check(token, query, url, api_key, domain_name, to):
-    print(green("# Searching for repositories.."))
-    print(green("# URL: '{}'".format(url)))
-    print(green("# Query: '{}'".format(query)))
+@click.group()
+@click.option(
+    '--url', '-u',
+    help='URL to Github instance. Defaults to github.com.',
+    default="https://github.com")
+@click.option(
+    '--token', '-t',
+    help='Github authentication token.')
+@click.pass_context
+def cli(ctx, url, token):
+    click.secho("# URL: '{}'".format(url), fg="green")
 
     if not url.startswith("http"):
         url = "https://" + url
-
     if "github.com" in url:
-        g = github3.github.GitHub(
+        gh = github3.github.GitHub(
             token=token)
     else:
-        g = github3.github.GitHubEnterprise(
+        gh = github3.github.GitHubEnterprise(
             url,
             token=token)
+    ctx.obj['gh'] = gh
+
+
+@cli.command()
+@click.pass_context
+@click.option(
+    '--query', '-q',
+    help='Query to run. e.g. "Allkit.h in:path" ',
+    required="True")
+@click.option(
+    '--mg-api-key',
+    help='Mailgun api key.')
+@click.option(
+    '--mg-domain',
+    help='Mailgun domain name.')
+@click.option(
+    '--to',
+    help='Email address to send alert to.')
+def check(ctx, query, mg_api_key, mg_domain, to):
+    """Checks to see if any repositories exist matching query,
+    prints the matching repositories and optionally sends them using Mailgun.
+
+    for more info on possible query patterns see
+    https://developer.github.com/v3/search/#search-code
+
+    \b
+    Examples:
+      * `./gh-tools -t "<github-token>" -u github.ugent.be check -q "Allkit.h in:path"`
+      * `./gh-tools -t "<github-token>" -u github.ugent.be check -q "Allkit.h in:path" --mg-api-key <mailgun-api-key> --mg-domain <mailgun-url> --to <email-address>`
+    """
+    click.secho("# Query: '{}'".format(query), fg="green")
+    click.secho("# Searching for repositories..", fg="green")
+
+    g = ctx.obj['gh']
 
     # https://developer.github.com/v3/search/#considerations-for-code-search
     results = repos_matching(g, query)
     if not results:
-        print("no results")
+        click.secho("no results")
     for result in results:
-        print(red(result.html_url))
+        click.secho(result.html_url, fg="red")
 
-    if results and api_key and domain_name and to:
-        print("Sending email")
-        notify(api_key, domain_name, to, results, query)
-
-
-def green(text):
-    return "\033[1;32m{}\033[1;m".format(text)
-
-def red(text):
-    return "\033[1;31m{}\033[1;m".format(text)
-
-
-
-def main():
-    parser = argparse.ArgumentParser(description='Github tools.')
-    parser.add_argument(
-        'command',
-        help='The command to execute.'
-             '"check" creates the repositories and '
-             '"grant" grants the students rights to the already created repositories.',
-        choices=['check'])
-    parser.add_argument(
-        '-t', '--token',
-        help='Github authentication token.',
-        required='True')
-    parser.add_argument(
-        '-u', '--url',
-        help='URL to Github Enterprise instance. Defaults to github.com.',
-        default="https://github.com")
-    parser.add_argument(
-        '-q', '--query',
-        help='Query to run.\n'
-             'Examples:\n'
-             '\t"Allkit.h in:path"\n'
-             '\t"BotBerryExceptions.cpp in:path"\n'
-             'More info: https://developer.github.com/v3/search/#search-code',
-        required="True")
-    parser.add_argument(
-        '--mg-api-key',
-        dest="api_key",
-        help='Mailgun api key.')
-    parser.add_argument(
-        '--mg-domain',
-        dest="domain_name",
-        help='Mailgun domain name.')
-    parser.add_argument(
-        '--to',
-        help='Email address to send alert to.')
-    results, _ = parser.parse_known_args(sys.argv[1:])
-
-
-    if results.command == "check":
-        check(results.token,
-              results.query,
-              results.url,
-              results.api_key, results.domain_name, results.to)
-    else:
-        print("COMMAND NOT RECOGNIZED")
-        exit(1)
+    if results and mg_api_key and mg_domain and to:
+        click.secho("Sending email")
+        notify(mg_api_key, mg_domain, to, results, query)
 
 
 if __name__ == "__main__":
-    main()
+    cli(obj={}) #pylint: disable=E1123,E1120
