@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import subprocess
+
 import click
 import github3
 import requests
@@ -98,6 +100,74 @@ def check(ctx, query, mg_api_key, mg_domain, to):
     if results and mg_api_key and mg_domain and to:
         click.secho("Sending email")
         notify(mg_api_key, mg_domain, to, results, query)
+
+
+
+
+
+
+
+
+@cli.command()
+@click.pass_context
+@click.option(
+    '--organization', '-o',
+    help='Github organization where student repos are located',
+    required="True")
+@click.option(
+    '--branch',
+    help='Name of the branch to create in students repos',
+    required="True")
+@click.option(
+    '--title',
+    help='Title of the pull request.',
+    required="True")
+@click.option(
+    '--body',
+    help='Body of the pull request (the message).',
+    required="True")
+@click.option(
+    '--source', '-s',
+    help='Source directory')
+def update_pr(ctx, organization, branch, title, body, source):
+    """Pushes updated code to a new branch on students repositories
+    and creates a pr.
+    """
+    click.secho("# Organization: '{}'".format(organization), fg="green")
+    click.secho("# Branch: '{}'".format(branch), fg="green")
+    click.secho("# title: '{}'".format(title), fg="green")
+    click.secho("# message: '{}'".format(body), fg="green")
+    click.secho("# source directory: '{}'".format(source), fg="green")
+    click.secho("# Creating update pr..", fg="green")
+
+    click.confirm('Please check if the above information is correct.\nDo you want to continue?', abort=True)
+
+    g = ctx.obj['gh']
+
+    org = g.organization(organization)
+
+    for repo in org.repositories():
+        command = ["git", "push", repo.ssh_url, "master:{}".format(branch)]
+        cwd = source
+        print("\nwill run `{}`\nin directory `{}`.".format(command, cwd))
+        if click.confirm('Do you want to continue?'):
+            subprocess.check_call(
+                command, cwd=cwd
+            )
+            pr = repo.create_pull(title, "master", branch, body=body)
+            click.secho("created pull request {}".format(pr.html_url))
+
+
+
+@cli.command()
+@click.pass_context
+def test(ctx):
+    """test function"""
+    g = ctx.obj['gh']
+    user = g.user("manraed")
+
+    click.secho(str(user))
+    click.secho(str(user.email))
 
 
 if __name__ == "__main__":
