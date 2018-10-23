@@ -1,4 +1,6 @@
-# gh-exam: helper script for running an exam on the UGent Github
+# gh-tools: helpers scripts for doing teacher stuff on Github
+
+## gh-exam: helper script for running an exam on the UGent Github
 
 1. `gh-exam create` maakt voor elke student een private repository aan op basis van opgavecode. De student krijgt er initieel nog geen toegang toe zodat we dit kunnen doen bv een dag voor het examen.
 2. Wanneer het examen begint geven we de studenten dan toegang tot hun repository met `gh-exam grant`.
@@ -12,7 +14,7 @@ Het idee is dan dat de studenten hun eigen repo clonen bij het starten van het e
 Als we willen kunnen we door middel van github triggers een scriptje laten lopen dat bij iedere push controleert of ze wel de correcte code ingedient hebben, we zouden zelfs al kunnen kijken of de code compileert bijvoorbeeld.
 
 
-## Creating student repositories
+### Creating student repositories
 
 ```bash
 ./gh-exam create -o <organization-name> -t <github-token> -s <path/to/assignment/repository>
@@ -25,8 +27,7 @@ This command creates a private repository for each student named `examen-<studen
 * Each repository is protected against force pushes. (rewrites of the git history)
 * This command **does not** grant the students access to the repository, use the `grant` command for that.
 
-
-## Granting students push-access to their repositories
+### Granting students push-access to their repositories
 
 ```bash
 ./gh-exam grant -o <organization-name> -t <github-token>
@@ -34,8 +35,7 @@ This command creates a private repository for each student named `examen-<studen
 
 This command grants each student push access to their repository in the specified organization.
 
-
-## Removing students push-access to their repositories
+### Removing students push-access to their repositories
 
 ```bash
 ./gh-exam remove-grant -o <organization-name> -t <github-token>
@@ -43,8 +43,7 @@ This command grants each student push access to their repository in the specifie
 
 This command removes students' push access to their repository and cancels any open invitation for that student.
 
-
-# gh-tools: helper script for searching code on Github
+## gh-tools: helper script
 
 ```txt
 Usage: gh-tools check [OPTIONS]
@@ -65,4 +64,21 @@ Options:
   --mg-domain TEXT   Mailgun domain name.
   --to TEXT          Email address to send alert to.
   --help             Show this message and exit.
+```
+
+```txt
+Usage: gh-tools update-pr [OPTIONS]
+
+  Pushes updated code to a new branch on students repositories and creates a
+  pr.
+
+Options:
+  -o, --organization TEXT  Github organization where student repos are located
+                           [required]
+  --branch TEXT            Name of the branch to create in students repos
+                           [required]
+  --title TEXT             Title of the pull request.  [required]
+  --body TEXT              Body of the pull request (the message).  [required]
+  -s, --source TEXT        Source directory
+  --help                   Show this message and exit.
 ```
