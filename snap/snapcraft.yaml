@@ -4,19 +4,28 @@ summary: gh-teacher helps teachers manage courses and exams that use GitHub.
 description: >
   gh-teacher helps teachers manage courses and exams that use GitHub.
 
-confinement: devmode
+confinement: strict
 
 parts:
   gh-tools:
     plugin: python
     python-version: python3
     source: .
-    python-packages:
-      - PyGithub
-      - github3.py
-      - click
-      - requests
+    requirements: requirements.txt
+    stage-packages:
+      - git
+      - ssh
 
 apps:
   gh-tools:
-    command: usr/bin/python3 bin/gh-tools
+    command: usr/bin/python3 $SNAP/bin/gh-tools
+    environment:
+      # UTF-8 is not yet very well supported inside snaps, so we force "C.UTF-8"
+      # to make sure we don't fallback to ASCII.
+      #   see: https://bugs.launchpad.net/snapcraft/+bug/1804845
+      LC_ALL: "C.UTF-8"
+      LANG: "C.UTF-8"
+    plugs:
+      - home
+      - network
+      - ssh-keys
