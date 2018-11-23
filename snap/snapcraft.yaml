@@ -1,0 +1,22 @@
+name: gh-teacher
+version: git
+summary: gh-teacher helps teachers manage courses and exams that use GitHub.
+description: >
+  gh-teacher helps teachers manage courses and exams that use GitHub.
+
+confinement: devmode
+
+parts:
+  gh-tools:
+    plugin: python
+    python-version: python3
+    source: .
+    python-packages:
+      - PyGithub
+      - github3.py
+      - click
+      - requests
+
+apps:
+  gh-tools:
+    command: usr/bin/python3 bin/gh-tools
