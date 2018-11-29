@@ -15,16 +15,13 @@ parts:
     stage-packages:
       - git
       - ssh
+  locales-launch:
+    # Remote part to fix locales issues where the locale fallsback to ASCII
+    #   More info: https://forum.snapcraft.io/t/the-locales-launch-remote-part/8729
 
 apps:
   gh-tools:
-    command: usr/bin/python3 $SNAP/bin/gh-tools
-    environment:
-      # UTF-8 is not yet very well supported inside snaps, so we force "C.UTF-8"
-      # to make sure we don't fallback to ASCII.
-      #   see: https://bugs.launchpad.net/snapcraft/+bug/1804845
-      LC_ALL: "C.UTF-8"
-      LANG: "C.UTF-8"
+    command: locales-launch $SNAP/usr/bin/python3 $SNAP/bin/gh-tools
     plugs:
       - home
       - network
