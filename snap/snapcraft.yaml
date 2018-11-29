@@ -16,7 +16,7 @@ parts:
       - git
       - ssh
   locales-launch:
-    # Remote part to fix locales issues where the locale fallsback to ASCII
+    # Remote part to get proper locale support.
     #   More info: https://forum.snapcraft.io/t/the-locales-launch-remote-part/8729
 
 apps:
