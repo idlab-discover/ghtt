@@ -1,13 +1,14 @@
-name: gh-teacher
+name: gh-teacher-tools
+base: core18
 version: git
-summary: gh-teacher helps teachers manage courses and exams that use GitHub.
+summary: gh-teacher-tools helps teachers manage courses and exams that use GitHub.
 description: >
-  gh-teacher helps teachers manage courses and exams that use GitHub.
+  gh-teacher-tools helps teachers manage courses and exams that use GitHub.
 
 confinement: strict
 
 parts:
-  gh-tools:
+  gh-teacher-tools:
     plugin: python
     python-version: python3
     source: .
@@ -20,8 +21,8 @@ parts:
     #   More info: https://forum.snapcraft.io/t/the-locales-launch-remote-part/8729
 
 apps:
-  gh-tools:
-    command: locales-launch $SNAP/usr/bin/python3 $SNAP/bin/gh-tools
+  gh-teacher-tools:
+    command: locales-launch $SNAP/usr/bin/python3 $SNAP/bin/gh-teacher-tools
     plugs:
       - home
       - network

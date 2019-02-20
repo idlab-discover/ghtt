@@ -10,16 +10,16 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(
-    name="gh-teacher",
+    name="gh-teacher-tools",
     version="0.0.1",
     author="Merlijn Sebrechts",
     author_email="merlijn.sebrechts@gmail.com",
-    description=("gh-teacher helps teachers manage courses and exams that use GitHub."),
+    description=("gh-teacher-tools helps teachers manage courses and exams that use GitHub."),
     license="AGPL",
     keywords="GitHub",
     url="http://packages.python.org/gh-teacher",
     packages=['gh-teacher'],
-    scripts=['gh-teacher/gh-tools', 'gh-teacher/gh-exam'],
+    scripts=['gh-teacher-tools/gh-teacher-tools', 'gh-teacher/gh-exam'],
     long_description=read('README.md'),
     classifiers=[
         "Development Status :: 3 - Alpha",

@@ -13,6 +13,10 @@ def notify(api_key, domain_name, to, results, query):
     text = ""
     for result in results:
         text = text + result.html_url + "\n"
+        commit = next(result.commits())
+        text = text + "\tAuthor name: {}".format(commit.commit.author["name"])
+        text = text + "\tAuthor email: {}".format(commit.commit.author["email"])
+        text = text + result.html_url + "\n"
 
     data = {
         'from': 'gh-tools <mailgun@{}>'.format(domain_name),
@@ -72,17 +76,18 @@ def cli(ctx, url, token):
 @click.option(
     '--to',
     help='Email address to send alert to.')
-def check(ctx, query, mg_api_key, mg_domain, to):
-    """Checks to see if any repositories exist matching query,
-    prints the matching repositories and optionally sends them using Mailgun.
+def search(ctx, query, mg_api_key, mg_domain, to):
+    """Searches repositories matching the query,
+    prints the matching repositories, name and email address of the last committer,
+    and optionally emails this info using Mailgun.
 
     for more info on possible query patterns see
     https://developer.github.com/v3/search/#search-code
 
     \b
     Examples:
-      * `./gh-tools -t "<github-token>" -u github.ugent.be check -q "Allkit.h in:path"`
-      * `./gh-tools -t "<github-token>" -u github.ugent.be check -q "Allkit.h in:path" --mg-api-key <mailgun-api-key> --mg-domain <mailgun-url> --to <email-address>`
+      * `./gh-tools -t "<github-token>" -u github.ugent.be search  -q "Allkit.h in:path"`
+      * `./gh-tools -t "<github-token>" -u github.ugent.be search  -q "Allkit.h in:path" --mg-api-key <mailgun-api-key> --mg-domain <mailgun-url> --to <email-address>`
     """
     click.secho("# Query: '{}'".format(query), fg="green")
     click.secho("# Searching for repositories..", fg="green")
@@ -95,6 +100,12 @@ def check(ctx, query, mg_api_key, mg_domain, to):
         click.secho("no results")
     for result in results:
         click.secho(result.html_url, fg="red")
+
+        click.secho("Metadata of last commit:")
+        commit = next(result.commits())
+        click.secho("\tAuthor name: {}".format(commit.commit.author["name"]))
+        click.secho("\tAuthor email: {}\n".format(commit.commit.author["email"]))
+
 
     if results and mg_api_key and mg_domain and to:
         click.secho("Sending email")
@@ -162,11 +173,23 @@ def update_pr(ctx, organization, branch, title, body, source):
 @click.pass_context
 def test(ctx):
     """test function"""
-    g = ctx.obj['gh']
-    user = g.user("manraed")
+    gh = ctx.obj['gh']
+    # owner = "QuintenDV"
+    # repository = "SOI-copterGame"
+    repos = [
+        #("floriandejonckheere", "project-soi"),
+        ("NBarbe", "bubbeltjes"),
+        ("manraed", "Bust-a-Bobble"),
+        ("aavdiere", "bust-a-bobble"),
+        ("jan-verm", "Bust-a-Bobble"),
+    ]
 
-    click.secho(str(user))
-    click.secho(str(user.email))
+    for owner, repository in repos:
+        print(owner + " " + repository)
+        repo = gh.repository(owner, repository)
+        click.secho("repo: {}".format(repo.name))
+        commit = next(repo.commits())
+        click.secho("commit: {}".format(commit.commit.author["email"]))
 
 
 if __name__ == "__main__":
