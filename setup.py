@@ -18,8 +18,8 @@ setup(
     license="AGPL",
     keywords="GitHub",
     url="http://packages.python.org/gh-teacher",
-    packages=['gh-teacher'],
-    scripts=['gh-teacher-tools/gh-teacher-tools', 'gh-teacher/gh-exam'],
+    packages=['gh-teacher-tools'],
+    scripts=['gh-teacher-tools/gh-teacher-tools', 'gh-teacher-tools/gh-exam'],
     long_description=read('README.md'),
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -31,4 +31,6 @@ setup(
         "Programming Language :: Python :: 3.5",
         "License :: OSI Approved :: GNU Affero General Public License v3",
     ],
+    install_requires=["PyGithub", "github3.py", "click", "requests"],
+    python_requires='>=3.5',
 )
