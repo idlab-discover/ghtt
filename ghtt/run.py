@@ -1,52 +1,15 @@
 #!/usr/bin/env python3
 import subprocess
+from functools import wraps
 
 import click
 import github3
 import requests
 
 
-def notify(api_key, domain_name, to, results, query):
-    url = 'https://api.mailgun.net/v3/{}/messages'.format(domain_name)
-    auth = ('api', api_key)
-
-    text = ""
-    for result in results:
-        text = text + result.html_url + "\n"
-        commit = next(result.commits())
-        text = text + "\tAuthor name: {}".format(commit.commit.author["name"])
-        text = text + "\tAuthor email: {}".format(commit.commit.author["email"])
-        text = text + result.html_url + "\n"
-
-    data = {
-        'from': 'gh-tools <mailgun@{}>'.format(domain_name),
-        'to': to,
-        'subject': "Alert! Repositories found who match query '{}'\n".format(query),
-        'text': text,
-    }
-
-    response = requests.post(url, auth=auth, data=data)
-    response.raise_for_status()
 
 
-def repos_matching(gh, query):
-    repos = set()
-    results = gh.search_code(query)
-    for result in results:
-        repos.add(result.repository)
-    return repos
-
-
-@click.group()
-@click.option(
-    '--url', '-u',
-    help='URL to Github instance. Defaults to github.com.',
-    default="https://github.com")
-@click.option(
-    '--token', '-t',
-    help='Github authentication token.')
-@click.pass_context
-def cli(ctx, url, token):
+def authenticate(url, token):
     click.secho("# URL: '{}'".format(url), fg="green")
 
     if not token:
@@ -69,7 +32,60 @@ def cli(ctx, url, token):
             token=token,
             username=username,
             password=password)
-    ctx.obj['gh'] = gh
+    return gh
+
+
+def notify(api_key, domain_name, to, results, query):
+    url = 'https://api.mailgun.net/v3/{}/messages'.format(domain_name)
+    auth = ('api', api_key)
+
+    text = ""
+    for result in results:
+        text = text + result.html_url + "\n"
+        commit = next(result.commits())
+        text = text + "\tAuthor name: {}".format(commit.commit.author["name"])
+        text = text + "\tAuthor email: {}".format(commit.commit.author["email"])
+        text = text + result.html_url + "\n"
+
+    data = {
+        'from': 'ghtt <mailgun@{}>'.format(domain_name),
+        'to': to,
+        'subject': "Alert! Repositories found who match query '{}'\n".format(query),
+        'text': text,
+    }
+
+    response = requests.post(url, auth=auth, data=data)
+    response.raise_for_status()
+
+
+def repos_matching(gh, query):
+    repos = set()
+    results = gh.search_code(query)
+    for result in results:
+        repos.add(result.repository)
+    return repos
+
+
+def needs_auth(f):
+    @wraps(f)
+    @click.option(
+        '--url', '-u',
+        help='URL to Github instance. Defaults to github.com.',
+        default="https://github.com")
+    @click.option(
+        '--token', '-t',
+        help='Github authentication token.')
+    @click.pass_context
+    def wrapper(ctx, url, token, *args, **kwargs):
+        ctx.obj['gh'] = authenticate(url, token)
+        return f(*args, **kwargs)
+    return wrapper
+
+
+@click.group()
+@click.pass_context
+def cli(ctx):
+    ctx.obj = {}
 
 
 @cli.command()
@@ -87,6 +103,7 @@ def cli(ctx, url, token):
 @click.option(
     '--to',
     help='Email address to send alert to.')
+@needs_auth
 def search(ctx, query, mg_api_key, mg_domain, to):
     """Searches repositories matching the query,
     prints the matching repositories, name and email address of the last committer,
@@ -97,8 +114,8 @@ def search(ctx, query, mg_api_key, mg_domain, to):
 
     \b
     Examples:
-      * `./gh-tools -t "<github-token>" -u github.ugent.be search  -q "Allkit.h in:path"`
-      * `./gh-tools -t "<github-token>" -u github.ugent.be search  -q "Allkit.h in:path" --mg-api-key <mailgun-api-key> --mg-domain <mailgun-url> --to <email-address>`
+      * `./ghtt search -t "<github-token>" -u github.ugent.be -q "Allkit.h in:path"`
+      * `./ghtt search -t "<github-token>" -u github.ugent.be -q "Allkit.h in:path" --mg-api-key <mailgun-api-key> --mg-domain <mailgun-url> --to <email-address>`
     """
     click.secho("# Query: '{}'".format(query), fg="green")
     click.secho("# Searching for repositories..", fg="green")
@@ -123,12 +140,6 @@ def search(ctx, query, mg_api_key, mg_domain, to):
         notify(mg_api_key, mg_domain, to, results, query)
 
 
-
-
-
-
-
-
 @cli.command()
 @click.pass_context
 @click.option(
@@ -150,6 +161,7 @@ def search(ctx, query, mg_api_key, mg_domain, to):
 @click.option(
     '--source', '-s',
     help='Source directory')
+@needs_auth
 def update_pr(ctx, organization, branch, title, body, source):
     """Pushes updated code to a new branch on students repositories
     and creates a pr.
@@ -179,29 +191,12 @@ def update_pr(ctx, organization, branch, title, body, source):
             click.secho("created pull request {}".format(pr.html_url))
 
 
-
-@cli.command()
-@click.pass_context
-def test(ctx):
-    """test function"""
-    gh = ctx.obj['gh']
-    # owner = "QuintenDV"
-    # repository = "SOI-copterGame"
-    repos = [
-        #("floriandejonckheere", "project-soi"),
-        ("NBarbe", "bubbeltjes"),
-        ("manraed", "Bust-a-Bobble"),
-        ("aavdiere", "bust-a-bobble"),
-        ("jan-verm", "Bust-a-Bobble"),
-    ]
-
-    for owner, repository in repos:
-        print(owner + " " + repository)
-        repo = gh.repository(owner, repository)
-        click.secho("repo: {}".format(repo.name))
-        commit = next(repo.commits())
-        click.secho("commit: {}".format(commit.commit.author["email"]))
+# @cli.command()
+# @click.pass_context
+# def test(ctx):
+#     """test function"""
+#     click.secho("test")
 
 
 if __name__ == "__main__":
-    cli(obj={}) #pylint: disable=E1123,E1120
+    cli() #pylint: disable=E1123,E1120

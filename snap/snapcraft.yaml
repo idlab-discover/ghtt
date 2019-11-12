@@ -1,16 +1,16 @@
-name: gh-teacher-tools
+name: ghtt
 title: Github Teacher Tools
 version: git
-summary: gh-teacher-tools helps teachers manage courses and exams that use GitHub.
+summary: ghtt helps teachers manage courses and exams that use GitHub.
 description: >
-  gh-teacher-tools helps teachers manage courses and exams that use GitHub.
+  ghtt helps teachers manage courses and exams that use GitHub.
 
 base: core18
 confinement: strict
 
 apps:
-  gh-teacher-tools:
-    command: usr/bin/python3 $SNAP/bin/gh-teacher-tools
+  ghtt:
+    command: bin/ghtt
     # https://forum.snapcraft.io/t/solved-utf-8-not-supported-in-snap/5994/5
     # https://forum.snapcraft.io/t/the-locales-launch-remote-part/8729
     environment:
