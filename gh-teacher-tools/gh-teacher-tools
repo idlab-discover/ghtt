@@ -49,15 +49,26 @@ def repos_matching(gh, query):
 def cli(ctx, url, token):
     click.secho("# URL: '{}'".format(url), fg="green")
 
+    if not token:
+        username = click.prompt("{} Username".format(url))
+        password = click.prompt("{} Password".format(url), hide_input=True)
+    else:
+        username = ""
+        password = ""
+
     if not url.startswith("http"):
         url = "https://" + url
     if "github.com" in url:
         gh = github3.github.GitHub(
-            token=token)
+            token=token,
+            username=username,
+            password=password)
     else:
         gh = github3.github.GitHubEnterprise(
             url,
-            token=token)
+            token=token,
+            username=username,
+            password=password)
     ctx.obj['gh'] = gh
 
 
