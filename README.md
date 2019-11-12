@@ -43,7 +43,7 @@ This command grants each student push access to their repository in the specifie
 
 This command removes students' push access to their repository and cancels any open invitation for that student.
 
-## gh-tools: helper script
+## gh-tools: helper script to search Github for repositories containing certain code
 
 ```txt
 Usage: gh-tools check [OPTIONS]

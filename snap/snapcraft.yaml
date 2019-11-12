@@ -1,29 +1,33 @@
 name: gh-teacher-tools
-base: core18
+title: Github Teacher Tools
 version: git
 summary: gh-teacher-tools helps teachers manage courses and exams that use GitHub.
 description: >
   gh-teacher-tools helps teachers manage courses and exams that use GitHub.
 
+base: core18
 confinement: strict
+
+apps:
+  gh-teacher-tools:
+    command: usr/bin/python3 $SNAP/bin/gh-teacher-tools
+    # https://forum.snapcraft.io/t/solved-utf-8-not-supported-in-snap/5994/5
+    # https://forum.snapcraft.io/t/the-locales-launch-remote-part/8729
+    environment:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+    plugs:
+      - home
+      - network
+      - ssh-keys
 
 parts:
   gh-teacher-tools:
     plugin: python
     python-version: python3
     source: .
-    requirements: requirements.txt
+    requirements: 
+      - requirements.txt
     stage-packages:
       - git
       - ssh
-  locales-launch:
-    # Remote part to get proper locale support.
-    #   More info: https://forum.snapcraft.io/t/the-locales-launch-remote-part/8729
-
-apps:
-  gh-teacher-tools:
-    command: locales-launch $SNAP/usr/bin/python3 $SNAP/bin/gh-teacher-tools
-    plugs:
-      - home
-      - network
-      - ssh-keys
