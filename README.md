@@ -26,7 +26,7 @@ Options:
   --help             Show this message and exit.
 ```
 
-## `ghtt update-pr`` helps you push code and create a pr to student repositories
+## `ghtt update-pr` helps you push code and create a pr to student repositories
 
 ```txt
 Usage: ghtt update-pr [OPTIONS]

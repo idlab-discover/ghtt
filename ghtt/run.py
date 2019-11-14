@@ -8,7 +8,6 @@ import requests
 
 
 
-
 def authenticate(url, token):
     click.secho("# URL: '{}'".format(url), fg="green")
 
@@ -76,7 +75,7 @@ def needs_auth(f):
         '--token', '-t',
         help='Github authentication token.')
     @click.pass_context
-    def wrapper(ctx, url, token, *args, **kwargs):
+    def wrapper(ctx, *args, url=None, token=None, **kwargs):
         ctx.obj['gh'] = authenticate(url, token)
         return f(*args, **kwargs)
     return wrapper
