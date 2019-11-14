@@ -1,5 +1,15 @@
 # ghtt: helpers scripts for doing teacher stuff on Github
 
+## Installation
+
+[ghtt is available from the snap store.](https://snapcraft.io/ghtt)
+
+```bash
+sudo snap install ghtt
+```
+
+> Note: you might need to [install snapd](https://snapcraft.io/docs/installing-snapd), if it's not available on your system.
+
 ## `ghtt search` helps you search GitHub for uploaded code
 
 ```txt
