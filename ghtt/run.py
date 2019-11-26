@@ -40,11 +40,12 @@ def notify(api_key, domain_name, to, results, query):
 
     text = ""
     for result in results:
-        text = text + result.html_url + "\n"
+        text = text + result.html_url
         commit = next(result.commits())
-        text = text + "\tAuthor name: {}".format(commit.commit.author["name"])
-        text = text + "\tAuthor email: {}".format(commit.commit.author["email"])
-        text = text + result.html_url + "\n"
+        text = text + "\nMetadata of last commit:"
+        text = text + "\n\tAuthor name: {}".format(commit.commit.author["name"])
+        text = text + "\n\tAuthor email: {}".format(commit.commit.author["email"])
+        text = text + "\n"
 
     data = {
         'from': 'ghtt <mailgun@{}>'.format(domain_name),
