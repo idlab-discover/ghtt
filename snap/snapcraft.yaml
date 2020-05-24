@@ -2,7 +2,7 @@ name: ghtt
 title: Github Teacher Tools
 version: git
 summary: ghtt helps teachers manage courses and exams that use GitHub.
-description: >
+description: |
   ghtt helps teachers manage courses and exams that use GitHub.
 
 base: core18
@@ -20,6 +20,7 @@ apps:
       - home
       - network
       - ssh-keys
+      - removable-media
 
 parts:
   gh-teacher-tools:
@@ -31,3 +32,10 @@ parts:
     stage-packages:
       - git
       - ssh
+
+plugs:
+  gitconfig:
+    interface: personal-files
+    read:
+      - $HOME/.gitconfig         # the old location
+      - $HOME/.config/git/config # the new location (people could change it via XDG_CONFIG_HOME and that isn't supported by snapd yet)

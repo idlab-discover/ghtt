@@ -20,7 +20,6 @@ setup(
     url="http://packages.python.org/gh-teacher",
     packages=find_packages(),
     include_package_data=True,
-    scripts=['ghtt/gh-exam'],
     entry_points={
         'console_scripts': [
             'ghtt = ghtt.run:cli',
@@ -37,6 +36,6 @@ setup(
         "Programming Language :: Python :: 3.5",
         "License :: OSI Approved :: GNU Affero General Public License v3",
     ],
-    install_requires=["PyGithub", "github3.py", "click", "requests"],
+    install_requires=["github3.py", "click", "requests"],
     python_requires='>=3.5',
 )
