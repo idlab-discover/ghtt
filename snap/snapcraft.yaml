@@ -37,9 +37,9 @@ parts:
       - git
       - ssh
 
-plugs:
-  gitconfig:
-    interface: personal-files
-    read:
-      - $HOME/.gitconfig         # the old location
-      - $HOME/.config/git/config # the new location (people could change it via XDG_CONFIG_HOME and that isn't supported by snapd yet)
+# plugs:
+#   gitconfig:
+#     interface: personal-files
+#     read:
+#       - $HOME/.gitconfig         # the old location
+#       - $HOME/.config/git/config # the new location (people could change it via XDG_CONFIG_HOME and that isn't supported by snapd yet)
