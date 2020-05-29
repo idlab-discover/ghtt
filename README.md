@@ -1,4 +1,4 @@
-# ghtt: helpers scripts for doing teacher stuff on Github
+# ghtt: helpers scripts for doing teacher stuff on GitHub
 
 ## Installation
 
