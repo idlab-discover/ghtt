@@ -8,6 +8,7 @@ import requests
 
 from .search import search
 from .assignment import assignment
+from .util import util
 
 
 @click.group()
@@ -18,6 +19,7 @@ def cli(ctx):
 
 cli.add_command(search)
 cli.add_command(assignment)
+cli.add_command(util)
 
 
 if __name__ == "__main__":

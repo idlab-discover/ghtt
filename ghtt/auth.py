@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import subprocess
 from functools import wraps
+import subprocess
+from urllib.parse import urlparse
 
 import click
 import github3
@@ -16,17 +17,17 @@ def authenticate(url, token):
     else:
         username = ""
         password = ""
+    
+    url = urlparse(url)
 
-    if not url.startswith("http"):
-        url = "https://" + url
-    if "github.com" in url:
+    if url.netloc == "github.com":
         gh = github3.github.GitHub(
             token=token,
             username=username,
             password=password)
     else:
         gh = github3.github.GitHubEnterprise(
-            url,
+            'https://{url.netloc}/'.format(url=url),
             token=token,
             username=username,
             password=password)
@@ -34,7 +35,7 @@ def authenticate(url, token):
 
         # Protect using the pygithub library because it's not supported with github3.py
         pyg = pygithub.Github(
-            base_url="{}/api/v3".format(url),
+            base_url="https://{url.netloc}/api/v3".format(url=url),
             login_or_token=token)
 
     return (gh, pyg)
@@ -55,5 +56,6 @@ def needs_auth(f):
     @click.pass_context
     def wrapper(ctx, *args, url=None, token=None, **kwargs):
         (ctx.obj['gh'], ctx.obj['pyg']) = authenticate(url, token)
+        ctx.obj['url'] = url
         return f(*args, **kwargs)
     return wrapper

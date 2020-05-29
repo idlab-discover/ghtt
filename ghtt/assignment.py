@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-import subprocess
+
 from functools import wraps
 import os
+import subprocess
+from urllib.parse import urlparse
 
 import click
 import github3
@@ -21,10 +23,6 @@ def assignment(ctx):
 @assignment.command()
 @click.pass_context
 @click.option(
-    '--organization', '-o',
-    help='Github organization where student repos are located',
-    required="True")
-@click.option(
     '--branch',
     help='Name of the branch to create in students repos',
     required="True")
@@ -39,10 +37,12 @@ def assignment(ctx):
 @click.option(
     '--source', '-s',
     help='Source directory')
-def create_pr(ctx, organization, branch, title, body, source):
+def create_pr(ctx, branch, title, body, source):
     """Pushes updated code to a new branch on students repositories and creates a pr to merge that
     branch into master.
     """
+    organization = urlparse(ctx.obj['url']).path.rstrip("/").rsplit("/", 1)[-1]
+
     click.secho("# Organization: '{}'".format(organization), fg="green")
     click.secho("# Branch: '{}'".format(branch), fg="green")
     click.secho("# title: '{}'".format(title), fg="green")
@@ -93,10 +93,6 @@ def generate_from_template(path, username, clone_url, repo_name):
 @assignment.command()
 @click.pass_context
 @click.option(
-    '--organization', '-o',
-    help='Github organization where student repos are located',
-    required="True")
-@click.option(
     '--source',
     help='path to repo with start code',
     required="True")
@@ -104,14 +100,16 @@ def generate_from_template(path, username, clone_url, repo_name):
     '--students',
     help='comma-separated list of students',
     required="True")
-def create_repos(ctx, organization, source, students):
-    """Create student repositories in the specified organization.
+def create_repos(ctx, source, students):
+    """Create student repositories in the organization specified by the url.
     Each repository will contain a copy of the specified source and will have force-pushing disabled
     so students can not rewrite history.
 
     Note: this command does not grant students access to those repositories. See `assignment grant`.
     """
+    organization = urlparse(ctx.obj['url']).path.rstrip("/").rsplit("/", 1)[-1]
     students = students.split(",")
+
     click.secho("# Creating student repositories..", fg="green")
     click.secho("# Org: '{}'".format(organization), fg="green")
     click.secho("# Path: '{}'".format(source), fg="green")
@@ -132,9 +130,8 @@ def create_repos(ctx, organization, source, students):
             repo = g.repository(organization, reponame)
 
         subprocess.check_call(["git", "checkout", "master"], cwd=source)
-        subprocess.call(["git", "checkout", "-b", student], cwd=source)
-        subprocess.check_call(["git", "checkout", student], cwd=source)
-        subprocess.check_call(["git", "merge", "--strategy-option", "theirs", "master"], cwd=source)
+        subprocess.call(["git", "branch", "-D", student], cwd=source)
+        subprocess.check_call(["git", "checkout", "-b", student], cwd=source)
 
         if os.path.isfile("{}/README.md.jinja".format(source)):
             generate_from_template(
@@ -159,17 +156,14 @@ def create_repos(ctx, organization, source, students):
 @assignment.command()
 @click.pass_context
 @click.option(
-    '--organization', '-o',
-    help='Github organization where student repos are located',
-    required="True")
-@click.option(
     '--students',
     help='list of students',
     required="True")
-def grant(ctx, organization, students):
-    """Grant each student push access (the collaborator role) to their repository in the specified
-    organization.
+def grant(ctx, students):
+    """Grant each student push access (the collaborator role) to their repository in the
+    organization specified by the url.
     """
+    organization = urlparse(ctx.obj['url']).path.rstrip("/").rsplit("/", 1)[-1]
     students = students.split(",")
 
     click.secho("# Granting students write permission to their repository..", fg="green")
@@ -189,17 +183,16 @@ def grant(ctx, organization, students):
 @assignment.command()
 @click.pass_context
 @click.option(
-    '--organization', '-o',
-    help='Github organization where student repos are located',
-    required="True")
-@click.option(
     '--students',
     help='list of students',
     required="True")
-def remove_grant(ctx, organization, students):
+def remove_grant(ctx, students):
     """Removes students' push access to their repository and cancels any open invitation for that
     student.
     """
+    organization = urlparse(ctx.obj['url']).path.rstrip("/").rsplit("/", 1)[-1]
+    students = students.split(",")
+
     click.secho("# Removing students write permission to their repository..", fg="green")
     click.secho("# Org: '{}'".format(organization), fg="green")
     click.secho("# Students: '{}'".format(students), fg="green")
