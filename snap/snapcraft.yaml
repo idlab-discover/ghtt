@@ -1,5 +1,5 @@
 name: ghtt
-title: Github Teacher Tools
+title: GitHub Teacher Tools
 version: git
 summary: ghtt helps teachers manage courses and exams that use GitHub.
 description: |
@@ -29,6 +29,10 @@ parts:
     source: .
     requirements: 
       - requirements.txt
+    build-packages:
+      # Dependencies for building `cryptography` on non-amd64 systems.
+      - libffi-dev
+      - libssl-dev
     stage-packages:
       - git
       - ssh
