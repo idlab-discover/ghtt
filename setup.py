@@ -22,7 +22,7 @@ setup(
     include_package_data=True,
     entry_points={
         'console_scripts': [
-            'ghtt = ghtt.run:cli',
+            'ghtt = ghtt.__main__:cli',
         ],
     },
     long_description=read('README.md'),
@@ -36,6 +36,6 @@ setup(
         "Programming Language :: Python :: 3.5",
         "License :: OSI Approved :: GNU Affero General Public License v3",
     ],
-    install_requires=["github3.py", "click", "requests"],
+    install_requires=["github3.py", "pygithub", "click", "requests", "jinja2"],
     python_requires='>=3.5',
 )
