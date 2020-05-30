@@ -17,7 +17,10 @@ def authenticate(url, token):
     else:
         username = ""
         password = ""
-    
+
+    if not url.startswith("http"):
+        url = "https://" + url
+
     url = urlparse(url)
 
     if url.netloc == "github.com":
