@@ -28,6 +28,8 @@ def authenticate(url, token):
             token=token,
             username=username,
             password=password)
+        # Protect using the pygithub library because it's not supported with github3.py
+        pyg = pygithub.Github(login_or_token=token)
     else:
         gh = github3.github.GitHubEnterprise(
             'https://{url.netloc}/'.format(url=url),
