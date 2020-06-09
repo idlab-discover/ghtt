@@ -4,10 +4,12 @@ from functools import wraps
 import os
 import subprocess
 from urllib.parse import urlparse
+from datetime import datetime
 
 import click
 import github3
 import requests
+from tabulate import tabulate
 import jinja2
 import github as pygithub
 
@@ -67,8 +69,11 @@ def create_pr(ctx, branch, title, body, source):
             click.secho("created pull request {}".format(pr.html_url))
 
 
-def get_reponame(username):
-    return "examen-{}".format(username.lower())
+def get_reponame(username, organization):
+    return "{}-{}".format(organization.lower(), username.lower())
+
+# def get_reponame(username, organization):
+#     return "examen-{}".format(username.lower())
 
 
 def generate_from_template(path, username, clone_url, repo_name):
@@ -123,7 +128,7 @@ def create_repos(ctx, source, students):
     for student in students:
         click.secho("\n\nPreparing repo for {}".format(student), fg="green")
 
-        reponame = get_reponame(student)
+        reponame = get_reponame(student, organization)
         try:
             repo = org.create_repository(reponame, private=True)
         except Exception:
@@ -152,6 +157,50 @@ def create_repos(ctx, source, students):
         pygmaster.edit_protection()
 
 
+@assignment.command()
+@click.pass_context
+@click.option(
+    '--source',
+    help='path to repo with start code',
+    required="True")
+@click.option(
+    '--students',
+    help='comma-separated list of students',
+    required="True")
+def pull(ctx, source, students):
+    """Show the latest commit of each student
+    """
+    organization = urlparse(ctx.obj['url']).path.rstrip("/").rsplit("/", 1)[-1]
+    students = students.split(",")
+
+    click.secho("# Showing the latest commit..", fg="green")
+    click.secho("# Org: '{}'".format(organization), fg="green")
+    click.secho("# Path: '{}'".format(source), fg="green")
+    click.secho("# Students: '{}'".format(students), fg="green")
+
+    g = ctx.obj['gh']
+    summary = []
+
+    try:
+        for student in students:
+            reponame = get_reponame(student, organization)
+            repo = g.repository(organization, reponame)
+
+            subprocess.check_call(["git", "checkout", student], cwd=source)
+
+            subprocess.check_call(["git", "pull", repo.ssh_url, "master:{}".format(student)], cwd=source)
+
+            timestamp = subprocess.check_output(["git", "log", "-1", "--pretty=format:%ct"], cwd=source, universal_newlines=True).rstrip()
+            commit_summary = subprocess.check_output(["git", "log", "-1", "--pretty=format:%s"], cwd=source, universal_newlines=True)
+            committer = subprocess.check_output(["git", "log", "-1", "--pretty=format:%an <%ae>"], cwd=source, universal_newlines=True)
+
+            commit_time = datetime.fromtimestamp(int(timestamp))
+            summary.append((student, commit_time, committer, commit_summary))
+    finally:
+        subprocess.check_call(["git", "checkout", "master"], cwd=source)
+        summary.sort(key=lambda tup: tup[1])
+        click.secho(tabulate(summary, headers=['Username', 'Last commit time', "committer info", 'commit summary']))
+
 
 @assignment.command()
 @click.pass_context
@@ -173,7 +222,7 @@ def grant(ctx, students):
     g = ctx.obj['gh']
 
     for student in students:
-        reponame = get_reponame(student)
+        reponame = get_reponame(student, organization)
         repo = g.repository(organization, reponame)
 
         click.secho("Adding the student as collaborator", fg="green")
@@ -200,7 +249,7 @@ def remove_grant(ctx, students):
     g = ctx.obj['gh']
 
     for student in students:
-        reponame = get_reponame(student)
+        reponame = get_reponame(student, organization)
         repo = g.repository(organization, reponame)
 
         # Delete open invitations for that user
