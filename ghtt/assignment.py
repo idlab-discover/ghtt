@@ -105,7 +105,11 @@ def generate_from_template(path, username, clone_url, repo_name):
     '--students',
     help='comma-separated list of students',
     required="True")
-def create_repos(ctx, source, students):
+@click.option(
+    '--comments',
+    help='optional comma-separated list of comments',
+    required="False")
+def create_repos(ctx, source, students, comments):
     """Create student repositories in the organization specified by the url.
     Each repository will contain a copy of the specified source and will have force-pushing disabled
     so students can not rewrite history.
@@ -114,6 +118,9 @@ def create_repos(ctx, source, students):
     """
     organization = urlparse(ctx.obj['url']).path.rstrip("/").rsplit("/", 1)[-1]
     students = students.split(",")
+    if comments:
+        comments = comments.split(",")
+        assert(len(students) == len(comments))
 
     click.secho("# Creating student repositories..", fg="green")
     click.secho("# Org: '{}'".format(organization), fg="green")
@@ -125,7 +132,7 @@ def create_repos(ctx, source, students):
 
     org = g.organization(organization)
 
-    for student in students:
+    for idx, student in enumerate(students):
         click.secho("\n\nPreparing repo for {}".format(student), fg="green")
 
         reponame = get_reponame(student, organization)
@@ -155,6 +162,10 @@ def create_repos(ctx, source, students):
         pygrepo = pyg.get_repo("{}/{}".format(organization, reponame))
         pygmaster = pygrepo.get_branch("master")
         pygmaster.edit_protection()
+
+        if comments:
+            click.secho("Adding comment to repo", fg="green")
+            pygrepo.edit(description=comments[idx])
 
 
 @assignment.command()
