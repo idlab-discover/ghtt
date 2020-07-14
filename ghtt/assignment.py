@@ -206,11 +206,11 @@ def pull(ctx, source, students):
             committer = subprocess.check_output(["git", "log", "-1", "--pretty=format:%an <%ae>"], cwd=source, universal_newlines=True)
 
             commit_time = datetime.fromtimestamp(int(timestamp))
-            summary.append((student, commit_time, committer, commit_summary))
+            summary.append((student, repo.description, commit_time, committer, commit_summary))
     finally:
         subprocess.check_call(["git", "checkout", "master"], cwd=source)
-        summary.sort(key=lambda tup: tup[1])
-        click.secho(tabulate(summary, headers=['Username', 'Last commit time', "committer info", 'commit summary']))
+        summary.sort(key=lambda tup: tup[2])
+        click.secho(tabulate(summary, headers=['Username', "Description", 'Last commit time', "Committer info", 'Commit summary']))
 
 
 @assignment.command()

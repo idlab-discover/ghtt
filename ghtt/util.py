@@ -2,6 +2,7 @@
 import subprocess
 from functools import wraps
 import os
+import shutil
 
 import click
 import github3
@@ -35,3 +36,21 @@ def grep_in(path, strings):
             if string in line:
                 click.secho(line.strip())
                 break
+
+
+@util.command()
+@click.argument("source", required="True")
+def branches_to_folders(source):
+    """Expands a git repository so each branch is in a different folder.
+
+    SOURCE: path to git repository
+    """
+
+    branches = subprocess.check_output(["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/*"], cwd=source, universal_newlines=True)
+    branches = branches.strip().split("\n")
+
+    os.mkdir("{}.expanded".format(source))
+
+    for branch in branches:
+        subprocess.check_call(["git", "checkout", branch], cwd=source)
+        shutil.copytree(source, "{}.expanded/{}".format(source, branch))
