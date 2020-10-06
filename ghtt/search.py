@@ -3,23 +3,24 @@ import subprocess
 from functools import wraps
 
 import click
-import github3
+import github
 import requests
+from typing import List
 
 from .auth import needs_auth
 
 
-def notify(api_key, domain_name, to, results, query):
+def notify(api_key, domain_name, to, repos, query):
     url = 'https://api.mailgun.net/v3/{}/messages'.format(domain_name)
     auth = ('api', api_key)
 
     text = ""
-    for result in results:
-        text = text + result.html_url
-        commit = next(result.commits())
+    for g_repo in repos:
+        text = text + g_repo.html_url
+        g_commit = g_repo.get_branch("master").commit
         text = text + "\nMetadata of last commit:"
-        text = text + "\n\tAuthor name: {}".format(commit.commit.author["name"])
-        text = text + "\n\tAuthor email: {}".format(commit.commit.author["email"])
+        text = text + "\n\tAuthor name: {}".format(g_commit.commit.author.name)
+        text = text + "\n\tAuthor email: {}".format(g_commit.commit.author.email)
         text = text + "\n"
 
     data = {
@@ -33,11 +34,11 @@ def notify(api_key, domain_name, to, results, query):
     response.raise_for_status()
 
 
-def repos_matching(gh, query):
-    repos = set()
-    results = gh.search_code(query)
+def repos_matching(g : github.Github, query) -> List[github.Repository.Repository]:
+    repos = list()
+    results = g.search_code(query)
     for result in results:
-        repos.add(result.repository)
+        repos.append(result.repository)
     return repos
 
 
@@ -73,21 +74,21 @@ def search(ctx, query, mg_api_key, mg_domain, to):
     click.secho("# Query: '{}'".format(query), fg="green")
     click.secho("# Searching for repositories..", fg="green")
 
-    g = ctx.obj['gh']
+    g : github.Github = ctx.obj['pyg']
 
     # https://developer.github.com/v3/search/#considerations-for-code-search
-    results = repos_matching(g, query)
-    if not results:
+    g_repos = repos_matching(g, query)
+    if not g_repos:
         click.secho("no results")
-    for result in results:
-        click.secho(result.html_url, fg="red")
+    for g_repo in g_repos:
+        click.secho(g_repo.html_url, fg="red")
 
         click.secho("Metadata of last commit:")
-        commit = next(result.commits())
-        click.secho("\tAuthor name: {}".format(commit.commit.author["name"]))
-        click.secho("\tAuthor email: {}\n".format(commit.commit.author["email"]))
+        g_commit = g_repo.get_branch("master").commit
+        click.secho("\tAuthor name: {}".format(g_commit.commit.author.name))
+        click.secho("\tAuthor email: {}\n".format(g_commit.commit.author.email))
 
 
-    if results and mg_api_key and mg_domain and to:
+    if g_repos and mg_api_key and mg_domain and to:
         click.secho("Sending email")
-        notify(mg_api_key, mg_domain, to, results, query)
+        notify(mg_api_key, mg_domain, to, g_repos, query)

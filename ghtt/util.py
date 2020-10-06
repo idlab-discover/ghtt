@@ -5,7 +5,6 @@ import os
 import shutil
 
 import click
-import github3
 import requests
 import jinja2
 import github as pygithub

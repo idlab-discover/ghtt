@@ -4,15 +4,17 @@ import subprocess
 from urllib.parse import urlparse
 
 import click
-import github3
 import github as pygithub
 import requests
+
+import ghtt.config
 
 def authenticate(url, token):
     click.secho("# URL: '{}'".format(url), fg="green")
 
     if not token:
         username = click.prompt("{} Username".format(url))
+        token = username
         password = click.prompt("{} Password".format(url), hide_input=True)
     else:
         username = ""
@@ -24,29 +26,16 @@ def authenticate(url, token):
     url = urlparse(url)
 
     if url.netloc == "github.com":
-        gh = github3.github.GitHub(
-            token=token,
-            username=username,
+        pyg = pygithub.Github(
+            login_or_token=token,
             password=password)
-        # Protect using the pygithub library because it's not supported with github3.py
-        pyg = pygithub.Github(login_or_token=token)
     else:
-        gh = github3.github.GitHubEnterprise(
-            'https://{url.netloc}/'.format(url=url),
-            token=token,
-            username=username,
-            password=password)
-
-
-        # Protect using the pygithub library because it's not supported with github3.py
         pyg = pygithub.Github(
             base_url="https://{url.netloc}/api/v3".format(url=url),
-            login_or_token=token)
+            login_or_token=token,
+            password=password)
 
-    return (gh, pyg)
-
-
-
+    return pyg
 
 
 def needs_auth(f):
@@ -54,13 +43,13 @@ def needs_auth(f):
     @click.option(
         '--url', '-u',
         help='URL to Github instance. Defaults to github.com.',
-        default="https://github.com")
+        default=lambda: ghtt.config.get('url', "https://github.com"))
     @click.option(
         '--token', '-t',
         help='Github authentication token.')
     @click.pass_context
     def wrapper(ctx, *args, url=None, token=None, **kwargs):
-        (ctx.obj['gh'], ctx.obj['pyg']) = authenticate(url, token)
+        ctx.obj['pyg'] = authenticate(url, token)
         ctx.obj['url'] = url
         return f(*args, **kwargs)
     return wrapper

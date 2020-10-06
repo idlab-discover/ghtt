@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-import subprocess
-from functools import wraps
-
 import click
-import github3
-import requests
 
 from .search import search
 from .assignment import assignment
