@@ -4,9 +4,12 @@ from functools import wraps
 import os
 import subprocess
 from datetime import datetime
+from typing import Optional, List, Dict, Union
 
 import click
 import requests
+import yaml
+from github import Repository
 from tabulate import tabulate
 import jinja2
 import github
@@ -175,6 +178,112 @@ def create_repos(ctx, source, students=None, groups=None):
 
         click.secho("Adding comment to repo", fg="green")
         g_repo.edit(description=repo.comment)
+
+
+def to_strlist_helper(str_or_list: Union[str, List[str], None]) -> List[str]:
+    if str_or_list is None:
+        return []
+    elif isinstance(str_or_list, str):
+        return [str_or_list]
+    else:
+        assert isinstance(str_or_list, list)
+        return str_or_list
+
+
+def use_jinja(target: str, stud_repo: ghtt.config.StudentRepo, g_repo: Repository) -> str:
+    template = jinja2.Template(target)
+    mentor = [m for m in stud_repo.mentors if m == stud_repo.students[0].mentor_username][0]
+
+    return template.render(
+        clone_url=g_repo.clone_url,
+        repo_name=g_repo.repo_name,
+        student1_fullname=stud_repo.students[0].fullname,  # TODO
+        student1_username=stud_repo.students[0].username,
+        student2_fullname=stud_repo.students[0].fullname,  # TODO
+        student2_username=stud_repo.students[0].username,
+        mentor_username=mentor.username,
+        mentor_fullname=mentor.fullname,  # TODO
+        mentor_email=mentor.email,  # TODO
+    )
+
+
+
+@assignment.command()
+@click.pass_context
+@click.option(
+    '--issuefile',
+    help='path to yml file describing issues to be created',
+    required=True)
+@click.option(
+    '--students',
+    help='Comma-separated list of usernames. Defaults to all students.',
+    required="False")
+@click.option(
+    '--groups',
+    help='Comma-separated list of group names. Defaults to all groups.',
+    required="False")
+def create_issues(ctx, source, issuefile, students=None, groups=None):
+    """Create student repositories in the organization specified by the url.
+    Each repository will contain a copy of the specified source and will have force-pushing disabled
+    so students can not rewrite history.
+
+    Note: this command does not grant students access to those repositories. See `assignment grant`.
+    """
+    if students:
+        students = students.split(",")
+    if groups:
+        groups = groups.split(",")
+
+    click.secho("# Creating issues defined in {}...".format(issuefile), fg="green")
+    click.secho("# Source: '{}'".format(source), fg="green")
+
+    with open(issuefile) as f:
+        issues_commands: Optional[List[Dict]] = yaml.safe_load(f).get('add')
+    assert issues_commands is not None
+    assert isinstance(issues_commands, list)
+    assert len(issues_commands) > 0
+    assert isinstance(issues_commands[0], dict)
+
+    g: github.Github = ctx.obj['pyg']
+    g_org = g.get_organization(ghtt.config.get_organization())
+
+    students = ghtt.config.get_students(usernames=students, groups=groups)
+    mentors = ghtt.config.get_mentors()
+    repos = ghtt.config.get_repos(students, mentors)
+
+    for repo in repos.values():
+        click.secho("\n\nGenerating issues in repo {}".format(repo.name), fg="green")
+
+        g_repo = g_org.get_repo(repo.name)
+
+        #Saw the below in other code, but why would this be needed? Why doesn't g_repo work?
+        # g_repo = g.get_repo("{}/{}".format(repo.organization, g_repo.name))
+        # g_master = g_repo.get_branch("master")
+
+        for issues_command in issues_commands:
+            command_type = issues_command.get('type')
+
+            if command_type == 'milestone':
+                g_repo.create_milestone(
+                    title=issues_command.get('title'),
+                    description=issues_command.get('description'),
+                    due_on=issues_command.get('due_on')
+                )
+            elif command_type == 'issue':
+                click.secho("Adding issue with title \"{}\"".format(issues_command.get('title')), fg="green")
+
+                # find the milestone, if any
+                milestone = issues_command.get('milestone', default=None)
+                if milestone is not None:
+                    milestone = [ms for ms in g_repo.get_milestones() if ms.title == milestone][0]
+
+                g_repo.create_issue(
+                    title=issues_command.get('title'),
+                    body=issues_command.get('body'),
+                    milestone=milestone,
+                    labels=to_strlist_helper(issues_command.get('labels')),
+                    assignees=to_strlist_helper(issues_command.get('assignees'))
+                )
 
 
 @assignment.command()

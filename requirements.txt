@@ -4,3 +4,4 @@ click
 requests
 tabulate
 pyyaml
+jinja2
