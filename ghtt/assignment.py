@@ -86,32 +86,37 @@ def create_pr(ctx, branch, title, body, source, students=None, groups=None):
             click.secho("created pull request {}".format(pr.html_url))
 
 
-def get_reponame(username, organization):
-    return "{}-{}".format(organization.lower(), username.lower())
-
-# def get_reponame(username, organization):
-#     return "examen-{}".format(username.lower())
-
-
-def generate_from_template(path, clone_url, repo_name, comment, group):
-    """generate_from_template fills in the provided jinja2 template. If the filename ends with
+def generate_file_from_template(path, clone_url, repo: ghtt.config.StudentRepo):
+    """generate_file_from_template fills in the provided jinja2 template. If the filename ends with
     `.jinja`, the template file is removed and the result is saved without that extension. If not,
     the template file is overwritten with the generated result.
     """
-    template = jinja2.Template(open(path).read())
-    outputText = template.render(
-        clone_url=clone_url,
-        repo_name=repo_name,
-        comment=comment,
-        group=group,
-    )
-    destination = path
+    print("TEMPLATE: ", open(path).read())
+
+    template = open(path).read()
+    outputText = render_template(template, clone_url, repo)
+    destination = str(path)
     if destination.endswith('.jinja'):
         os.remove(path)
         destination = destination[:-6]
     with open(destination, "w+") as d_file:
         d_file.write(outputText)
 
+
+def render_template(template: str, clone_url, repo: ghtt.config.StudentRepo) -> str:
+    template = jinja2.Template(template)
+    return template.render(
+        clone_url=clone_url,
+        group=repo.group,
+        students=repo.students,
+        mentors=repo.mentors,
+    )
+
+#%%
+# template = open("/home/merlijn/PHD/SYSPROG/project/sysprog-2020-opgave-code-studenten/README.md.jinja").read()
+
+
+#%%
 
 @assignment.command()
 @click.pass_context
@@ -144,7 +149,8 @@ def create_repos(ctx, source, students=None, groups=None):
     g_org = g.get_organization(ghtt.config.get_organization())
 
     students = ghtt.config.get_students(usernames=students, groups=groups)
-    repos = ghtt.config.get_repos(students)
+    mentors = ghtt.config.get_mentors()
+    repos = ghtt.config.get_repos(students, mentors=mentors)
 
     for repo in repos.values():
         click.secho("\n\nGenerating repo {}".format(repo.name), fg="green")
@@ -158,13 +164,14 @@ def create_repos(ctx, source, students=None, groups=None):
         subprocess.call(["git", "branch", "-D", repo.name], cwd=source)
         subprocess.check_call(["git", "checkout", "-b", repo.name], cwd=source)
 
-        if os.path.isfile("{}/README.md.jinja".format(source)):
-            generate_from_template(
-                "{}/README.md.jinja".format(source),
+
+        from pathlib import Path
+
+        for path in Path(source).rglob('*.jinja'):
+            generate_file_from_template(
+                path,
                 clone_url=g_repo.clone_url,
-                repo_name=g_repo.name,
-                comment=repo.comment,
-                group=repo.group)
+                repo=repo)
         subprocess.check_call(["git", "add", "-A"], cwd=source)
         subprocess.call(["git", "commit", "-m", "fill in templates"], cwd=source)
         click.secho("Pushing source to {}".format(g_repo.ssh_url), fg="green")
@@ -172,7 +179,7 @@ def create_repos(ctx, source, students=None, groups=None):
         subprocess.check_call(["git", "checkout", "master"], cwd=source)
         
         click.secho("Protecting the master branch so students can't rewrite history", fg="green")
-        g_repo = g.get_repo("{}/{}".format(repo.organization, g_repo.name))
+        g_repo = g_org.get_repo(repo.name)
         g_master = g_repo.get_branch("master")
         g_master.edit_protection()
 
@@ -180,109 +187,67 @@ def create_repos(ctx, source, students=None, groups=None):
         g_repo.edit(description=repo.comment)
 
 
-def to_strlist_helper(str_or_list: Union[str, List[str], None]) -> List[str]:
-    if str_or_list is None:
-        return []
-    elif isinstance(str_or_list, str):
-        return [str_or_list]
-    else:
-        assert isinstance(str_or_list, list)
-        return str_or_list
-
-
-def use_jinja(target: str, stud_repo: ghtt.config.StudentRepo, g_repo: Repository) -> str:
-    template = jinja2.Template(target)
-    mentor = [m for m in stud_repo.mentors if m == stud_repo.students[0].mentor_username][0]
-
-    return template.render(
-        clone_url=g_repo.clone_url,
-        repo_name=g_repo.repo_name,
-        student1_fullname=stud_repo.students[0].fullname,  # TODO
-        student1_username=stud_repo.students[0].username,
-        student2_fullname=stud_repo.students[0].fullname,  # TODO
-        student2_username=stud_repo.students[0].username,
-        mentor_username=mentor.username,
-        mentor_fullname=mentor.fullname,  # TODO
-        mentor_email=mentor.email,  # TODO
-    )
-
-
-
 @assignment.command()
 @click.pass_context
-@click.option(
-    '--issuefile',
-    help='path to yml file describing issues to be created',
+@click.argument(
+    "path",
     required=True)
 @click.option(
-    '--students',
-    help='Comma-separated list of usernames. Defaults to all students.',
+    "--students",
+    help="Comma-separated list of usernames. Defaults to all students.",
     required="False")
 @click.option(
-    '--groups',
-    help='Comma-separated list of group names. Defaults to all groups.',
+    "--groups",
+    help="Comma-separated list of group names. Defaults to all groups.",
     required="False")
-def create_issues(ctx, source, issuefile, students=None, groups=None):
+def create_issues(ctx, path, students=None, groups=None):
     """Create student repositories in the organization specified by the url.
-    Each repository will contain a copy of the specified source and will have force-pushing disabled
-    so students can not rewrite history.
-
-    Note: this command does not grant students access to those repositories. See `assignment grant`.
     """
     if students:
         students = students.split(",")
     if groups:
         groups = groups.split(",")
 
-    click.secho("# Creating issues defined in {}...".format(issuefile), fg="green")
-    click.secho("# Source: '{}'".format(source), fg="green")
+    click.secho("# Creating issues defined in {}...".format(path), fg="green")
 
-    with open(issuefile) as f:
-        issues_commands: Optional[List[Dict]] = yaml.safe_load(f).get('add')
-    assert issues_commands is not None
-    assert isinstance(issues_commands, list)
-    assert len(issues_commands) > 0
-    assert isinstance(issues_commands[0], dict)
+    with open(path) as f:
+        issue_templates: Optional[List[Dict]] = yaml.safe_load(f)
+    assert issue_templates is not None
+    assert isinstance(issue_templates, list)
+    assert len(issue_templates) > 0
+    assert isinstance(issue_templates[0], dict)
 
     g: github.Github = ctx.obj['pyg']
     g_org = g.get_organization(ghtt.config.get_organization())
 
     students = ghtt.config.get_students(usernames=students, groups=groups)
     mentors = ghtt.config.get_mentors()
-    repos = ghtt.config.get_repos(students, mentors)
+    repos = ghtt.config.get_repos(students, mentors=mentors)
 
     for repo in repos.values():
         click.secho("\n\nGenerating issues in repo {}".format(repo.name), fg="green")
 
         g_repo = g_org.get_repo(repo.name)
 
-        #Saw the below in other code, but why would this be needed? Why doesn't g_repo work?
-        # g_repo = g.get_repo("{}/{}".format(repo.organization, g_repo.name))
-        # g_master = g_repo.get_branch("master")
+        for issue_template in issue_templates:
+            issue_type = issue_template.get('type')
 
-        for issues_command in issues_commands:
-            command_type = issues_command.get('type')
-
-            if command_type == 'milestone':
+            if issue_type == 'milestone':
                 g_repo.create_milestone(
-                    title=issues_command.get('title'),
-                    description=issues_command.get('description'),
-                    due_on=issues_command.get('due_on')
+                    title=render_template(issue_template.get('title'), repo, g_repo.ssh_url),
+                    description=issue_template.get('description'),
+                    due_on=issue_template.get('due_on')
                 )
-            elif command_type == 'issue':
-                click.secho("Adding issue with title \"{}\"".format(issues_command.get('title')), fg="green")
-
-                # find the milestone, if any
-                milestone = issues_command.get('milestone', default=None)
-                if milestone is not None:
-                    milestone = [ms for ms in g_repo.get_milestones() if ms.title == milestone][0]
-
+            elif issue_type == 'issue':
+                click.secho("Adding issue with title '{}'".format(issue_template.get('title')), fg="green")
                 g_repo.create_issue(
-                    title=issues_command.get('title'),
-                    body=issues_command.get('body'),
-                    milestone=milestone,
-                    labels=to_strlist_helper(issues_command.get('labels')),
-                    assignees=to_strlist_helper(issues_command.get('assignees'))
+                    title=render_template(issue_template.get('title'), repo, g_repo.ssh_url),
+                    body=render_template(issue_template.get('body'), repo, g_repo.ssh_url),
+                    milestone=issue_template.get('milestone', default=None),
+                    labels=issue_template.get('labels', []),
+                    assignees=[
+                        render_template(a, repo, g_repo.ssh_url) for a in issue_template.get('assignees', [])
+                    ]
                 )
 
 

@@ -9,34 +9,34 @@ from jinja2 import Template
 import yaml
 
 
-class Student:
+class Person:
     username: str
     comment: str
     record: dict
     group: str
+    groups: List[str]
 
     def __init__(self, username: str):
         self.username = username
-        self.fullname = ""
-        self.email = ""
         self.comment = ""
-        self.mentor_username = None
         self.record = {}
         self.group = None
+        self.groups = []
 
     def __str__(self):
-        return "Student '{}' ('{}') [{}] {}".format(
-            self.username, self.comment, self.group, self.record)
+        return "Student '{}' ('{}') Group: '{}'  Groups: '{}'  Record: {}".format(
+            self.username, self.comment, self.group, self.groups, self.record)
 
 
 class StudentRepo:
     def __init__(self, name: str):
         self.name = name
         self.comment = ""
-        self.students: List[Student] = []
-        self.mentors: List[Student] = []
+        self.students: List[Person] = []
+        self.mentors: List[Person] = []
         self.organization = ""
         self.group = None
+
 
 def get(keypath: str, default):
     try:
@@ -52,67 +52,55 @@ def get(keypath: str, default):
     return default
 
 
-def get_students(usernames: List[str] = [], groups: List[str] = []) -> List[Student]:
-    students = []
-    student_config = get("students", None)
-    if not student_config:
-        return students
-    mapping = student_config['field-mapping']
+def get_persons(persons_config: dict, usernames: List[str] = [], groups: List[str] = []) -> List[Person]:
+    persons = []
+    if not persons_config:
+        return persons
+    mapping = persons_config['field-mapping']
     try:
-        with open(student_config["source"]) as f:
+        with open(persons_config["source"]) as f:
             rows = csv.DictReader(f, delimiter=',', quotechar='"')
             for row in rows:
-                student = Student(row[mapping['username']], )
-                student.username = student.username.strip("#")
-                if usernames and student.username not in usernames:
+                person = Person(row[mapping['username']], )
+                person.username = person.username.strip("#")
+                if usernames and person.username not in usernames:
                     continue
-                student.record = row
-                student.comment = Template(mapping["comment"]).render(record=student.record)
-                student.fullname = Template(mapping["fullname"]).render(record=student.record)
-                student.email = row[mapping['email']]
+                person.record = row
+                person.comment = Template(mapping["comment"]).render(record=person.record)
                 if mapping.get("group"):
-                    student.group = student.record[mapping['group']]
-                    student.group = student.group.lower()
-                    student.group = re.sub("[^0-9a-z]+", "-", student.group)
-                    if student.group == "":
-                        student.group = None
-                    if groups and student.group not in groups:
+                    person.group = person.record[mapping['group']]
+                    person.group = person.group.lower()
+                    person.group = re.sub("[^0-9a-z]+", "-", person.group)
+                    if person.group == "":
+                        person.group = None
+                    if groups and person.group not in groups:
                         continue
-                students.append(student)
+                if mapping.get("groups"):
+                    person.groups = person.record[mapping['groups']].split(",")
+                    if person.groups == "":
+                        person.groups = []
+                persons.append(person)
     except FileNotFoundError:
-        print("The student database '{}' was not found".format(student_config['source']))
-        return students
-    return students
+        print("The student database '{}' was not found".format(persons_config['source']))
+        return persons
+    return persons
 
 
-def get_mentors() -> List[Student]:
-    """
-    Assumes config contains:
-     mentors:
-        - fullname: Person 1
-          username: pers1
-          email: pers1@example.com
-        - fullname: Person 2
-          username: pers2
-          email: pers2@example.com
-    """
-    mentors_config = get("mentors", None)
-    if not mentors_config:
-        return []
-    mentors = []
-    for m in mentors_config:
-        mentor = Student(m.get('username'))
-        mentor.fullname = m.get('fullname')
-        mentor.email = m.get('email')
-        mentors.append(mentor)
-    return mentors
+def get_students(usernames: List[str] = [], groups: List[str] = []) -> List[Person]:
+    student_config = get("students", None)
+    return get_persons(student_config, usernames, groups)
+
+
+def get_mentors(usernames: List[str] = [], groups: List[str] = []) -> List[Person]:
+    config = get("mentors", None)
+    return get_persons(config, usernames, groups)
 
 
 def get_organization() -> str:
     return urlparse(get("url", None)).path.rstrip("/").rsplit("/", 1)[-1]
 
 
-def get_repos(students: List[Student], mentors: Optional[List[Student]] = None) -> Dict[str, StudentRepo]:
+def get_repos(students: List[Person], mentors: Optional[List[Person]] = None) -> Dict[str, StudentRepo]:
     if mentors is None:
         mentors = []
     repos = {}
@@ -142,13 +130,22 @@ def get_repos(students: List[Student], mentors: Optional[List[Student]] = None) 
         repo.group = student.group
         repo.comment = ", ".join([s.comment for s in repo.students])
         repo.organization = organization
-        repo.mentors = mentors
+        repo.mentors = [m for m in mentors if repo.group in m.groups]
         repos[repo.name] = repo
     return repos
 
-#%%
-import os
-os.chdir("/home/merlijn/PHD/GDV/project/")
-students = get_students(groups=["group-37"])
-for student in students:
-    print(student)
+
+
+
+# import os
+# os.chdir("/home/merlijn/PHD/SYSPROG/project/")
+# students = get_students(groups=["project-groep-test"])
+# for student in students:
+#     print(student)
+
+# print()
+# print()
+
+# mentors = get_mentors()
+# for student in mentors:
+#     print(student)
