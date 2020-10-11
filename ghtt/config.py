@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+#%%
 import csv
 import re
 from typing import List, Dict
@@ -31,7 +32,7 @@ class StudentRepo:
         self.comment = ""
         self.students = []
         self.organization = ""
-
+        self.group = None
 
 
 def get(keypath: str, default):
@@ -56,7 +57,7 @@ def get_students(usernames: List[str]=[], groups: List[str]=[]) -> List[Student]
     mapping = student_config['field-mapping']
     try:
         with open(student_config["source"]) as f:
-            rows = csv.DictReader(f, delimiter=',', quotechar='|')
+            rows = csv.DictReader(f, delimiter=',', quotechar='"')
             for row in rows:
                 student = Student(row[mapping['username']])
                 student.username = student.username.strip("#")
@@ -108,7 +109,15 @@ def get_repos(students:List[Student]) -> Dict[str, StudentRepo]:
                 student.username
             ))
         repo.students.append(student)
+        repo.group = student.group
         repo.comment = ", ".join([s.comment for s in repo.students])
         repo.organization = organization
         repos[repo.name] = repo
     return repos
+
+#%%
+import os
+os.chdir("/home/merlijn/PHD/GDV/project/")
+students = get_students(groups=["group-37"])
+for student in students:
+    print(student)

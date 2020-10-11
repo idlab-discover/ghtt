@@ -41,12 +41,10 @@ def assignment(ctx):
     default=lambda: ghtt.config.get('source', None))
 @click.option(
     '--students',
-    help='Comma-separated list of usernames. Defaults to all students.',
-    required="False")
+    help='Comma-separated list of usernames. Defaults to all students.')
 @click.option(
     '--groups',
-    help='Comma-separated list of group names. Defaults to all groups.',
-    required="False")
+    help='Comma-separated list of group names. Defaults to all groups.')
 def create_pr(ctx, branch, title, body, source, students=None, groups=None):
     """Pushes updated code to a new branch on students repositories and creates a pr to merge that
     branch into master.
@@ -92,7 +90,7 @@ def get_reponame(username, organization):
 #     return "examen-{}".format(username.lower())
 
 
-def generate_from_template(path, clone_url, repo_name):
+def generate_from_template(path, clone_url, repo_name, comment, group):
     """generate_from_template fills in the provided jinja2 template. If the filename ends with
     `.jinja`, the template file is removed and the result is saved without that extension. If not,
     the template file is overwritten with the generated result.
@@ -101,6 +99,8 @@ def generate_from_template(path, clone_url, repo_name):
     outputText = template.render(
         clone_url=clone_url,
         repo_name=repo_name,
+        comment=comment,
+        group=group,
     )
     destination = path
     if destination.endswith('.jinja'):
@@ -118,12 +118,10 @@ def generate_from_template(path, clone_url, repo_name):
     default=lambda: ghtt.config.get('source', None))
 @click.option(
     '--students',
-    help='Comma-separated list of usernames. Defaults to all students.',
-    required="False")
+    help='Comma-separated list of usernames. Defaults to all students.')
 @click.option(
     '--groups',
-    help='Comma-separated list of group names. Defaults to all groups.',
-    required="False")
+    help='Comma-separated list of group names. Defaults to all groups.')
 def create_repos(ctx, source, students=None, groups=None):
     """Create student repositories in the organization specified by the url.
     Each repository will contain a copy of the specified source and will have force-pushing disabled
@@ -161,7 +159,9 @@ def create_repos(ctx, source, students=None, groups=None):
             generate_from_template(
                 "{}/README.md.jinja".format(source),
                 clone_url=g_repo.clone_url,
-                repo_name=g_repo.name)
+                repo_name=g_repo.name,
+                comment=repo.comment,
+                group=repo.group)
         subprocess.check_call(["git", "add", "-A"], cwd=source)
         subprocess.call(["git", "commit", "-m", "fill in templates"], cwd=source)
         click.secho("Pushing source to {}".format(g_repo.ssh_url), fg="green")
@@ -185,12 +185,10 @@ def create_repos(ctx, source, students=None, groups=None):
     default=lambda: ghtt.config.get('source', None))
 @click.option(
     '--students',
-    help='Comma-separated list of usernames. Defaults to all students.',
-    required="False")
+    help='Comma-separated list of usernames. Defaults to all students.')
 @click.option(
     '--groups',
-    help='Comma-separated list of group names. Defaults to all groups.',
-    required="False")
+    help='Comma-separated list of group names. Defaults to all groups.')
 def pull(ctx, source, students=None, groups=None):
     """Show the latest commit of each student
     """
@@ -235,12 +233,10 @@ def pull(ctx, source, students=None, groups=None):
 @click.pass_context
 @click.option(
     '--students',
-    help='list of students',
-    required="False")
+    help='list of students')
 @click.option(
     '--groups',
-    help='Comma-separated list of group names. Defaults to all groups.',
-    required="False")
+    help='Comma-separated list of group names. Defaults to all groups.')
 def grant(ctx, students=None, groups=None):
     """Grant each student push access (the collaborator role) to their repository in the
     organization specified by the url.
@@ -257,12 +253,17 @@ def grant(ctx, students=None, groups=None):
     g_org = g.get_organization(ghtt.config.get_organization())
     
     students = ghtt.config.get_students(usernames=students, groups=groups)
+    for student in students:
+        print(student.username, student.group)
+
     repos = ghtt.config.get_repos(students)
+
+
 
     for repo in repos.values():
         g_repo = g_org.get_repo(repo.name)
         click.secho("Adding the student as collaborator", fg="green")
-        for student in students:
+        for student in repo.students:
             g_repo.add_to_collaborators(student.username)
 
 
@@ -270,12 +271,10 @@ def grant(ctx, students=None, groups=None):
 @click.pass_context
 @click.option(
     '--students',
-    help='list of students',
-    required="False")
+    help='list of students')
 @click.option(
     '--groups',
-    help='Comma-separated list of group names. Defaults to all groups.',
-    required="False")
+    help='Comma-separated list of group names. Defaults to all groups.')
 def remove_grant(ctx, students=None, groups=None):
     """Removes students' push access to their repository and cancels any open invitation for that
     student.
