@@ -194,14 +194,12 @@ def create_repos(ctx, source, students=None, groups=None):
     required=True)
 @click.option(
     "--students",
-    help="Comma-separated list of usernames. Defaults to all students.",
-    required="False")
+    help="Comma-separated list of usernames. Defaults to all students.")
 @click.option(
     "--groups",
-    help="Comma-separated list of group names. Defaults to all groups.",
-    required="False")
+    help="Comma-separated list of group names. Defaults to all groups.")
 def create_issues(ctx, path, students=None, groups=None):
-    """Create student repositories in the organization specified by the url.
+    """Create issues in the repositories of the specified users and groups.
     """
     if students:
         students = students.split(",")
@@ -233,20 +231,33 @@ def create_issues(ctx, path, students=None, groups=None):
             issue_type = issue_template.get('type')
 
             if issue_type == 'milestone':
-                g_repo.create_milestone(
-                    title=render_template(issue_template.get('title'), repo, g_repo.ssh_url),
-                    description=issue_template.get('description'),
-                    due_on=issue_template.get('due_on')
-                )
+                try:
+                    g_repo.create_milestone(
+                        title=render_template(issue_template.get('title'), g_repo.ssh_url, repo),
+                        description=issue_template.get('description'),
+                        due_on=issue_template.get('due date')
+                    )
+                except github.GithubException as e:
+                    if len(e.data["errors"]) != 1  or e.data["errors"][0]["code"] != "already_exists":
+                        raise
+
+                    
+
             elif issue_type == 'issue':
                 click.secho("Adding issue with title '{}'".format(issue_template.get('title')), fg="green")
+
+                # find the milestone, if any
+                milestone = issue_template.get('milestone', None)
+                if milestone is not None:
+                    milestone = [ms for ms in g_repo.get_milestones() if ms.title == milestone][0]
+
                 g_repo.create_issue(
-                    title=render_template(issue_template.get('title'), repo, g_repo.ssh_url),
-                    body=render_template(issue_template.get('body'), repo, g_repo.ssh_url),
-                    milestone=issue_template.get('milestone', default=None),
+                    title=render_template(issue_template.get('title'), g_repo.ssh_url, repo),
+                    body=render_template(issue_template.get('body'), g_repo.ssh_url, repo),
+                    milestone=milestone,
                     labels=issue_template.get('labels', []),
                     assignees=[
-                        render_template(a, repo, g_repo.ssh_url) for a in issue_template.get('assignees', [])
+                        render_template(a, g_repo.ssh_url, repo) for a in issue_template.get('assignees', [])
                     ]
                 )
 
