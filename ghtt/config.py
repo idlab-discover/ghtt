@@ -71,8 +71,7 @@ def get_persons(persons_config: dict, usernames: List[str] = [], groups: List[st
                 person.comment = Template(mapping["comment"]).render(record=person.record)
                 if mapping.get("group"):
                     person.group = person.record[mapping['group']]
-                    person.group = person.group.lower()
-                    person.group = re.sub("[^0-9a-z]+", "-", person.group)
+                    person.group = canonize_group(person.group)
                     if person.group == "":
                         person.group = None
                     if groups and person.group not in groups:
@@ -81,6 +80,8 @@ def get_persons(persons_config: dict, usernames: List[str] = [], groups: List[st
                     person.groups = person.record[mapping['groups']].split(",")
                     if person.groups == "":
                         person.groups = []
+                    person.groups = [group.strip() for group in person.groups]
+                    person.groups = [canonize_group(group) for group in person.groups]
                 persons.append(person)
     except FileNotFoundError:
         print("The student database '{}' was not found".format(persons_config['source']))
