@@ -55,6 +55,11 @@ def get(keypath: str, default):
 
 
 def get_persons(persons_config: dict, usernames: List[str] = [], groups: List[str] = []) -> List[Person]:
+    def canonize_group(group):
+        return re.sub("[^0-9a-z]+", "-", group.lower())
+
+    canonized_groups = [canonize_group(g) for g in groups] if groups else []
+
     persons = []
     if not persons_config:
         return persons
@@ -74,7 +79,7 @@ def get_persons(persons_config: dict, usernames: List[str] = [], groups: List[st
                     person.group = canonize_group(person.group)
                     if person.group == "":
                         person.group = None
-                    if groups and person.group not in groups:
+                    if canonized_groups and person.group not in canonized_groups:
                         continue
                 if mapping.get("groups"):
                     person.groups = person.record[mapping['groups']].split(",")
