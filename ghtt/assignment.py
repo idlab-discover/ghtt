@@ -44,46 +44,59 @@ def assignment(ctx):
     help='Source directory',
     default=lambda: ghtt.config.get('source', None))
 @click.option(
+    '--branch-already-pushed', '-B',
+    help="Branch has already been pushed, so this doesn't need to be done anymore.",
+    is_flag=True)
+@click.option(
     '--students',
     help='Comma-separated list of usernames. Defaults to all students.')
 @click.option(
     '--groups',
     help='Comma-separated list of group names. Defaults to all groups.')
-def create_pr(ctx, branch, title, body, source, students=None, groups=None):
+def create_pr(ctx, branch, title, body, source, students=None, groups=None, branch_already_pushed=False):
     """Pushes updated code to a new branch on students repositories and creates a pr to merge that
     branch into master.
     """
     click.secho("# Branch: '{}'".format(branch), fg="green")
     click.secho("# title: '{}'".format(title), fg="green")
     click.secho("# message: '{}'".format(body), fg="green")
-    click.secho("# source directory: '{}'".format(source), fg="green")
+    if not branch_already_pushed:
+        click.secho("# source directory: '{}'".format(source), fg="green")
+    else:
+        click.secho("# Branch has been pushed already.", fg="green")
     click.secho("# Creating update pr..", fg="green")
 
     click.confirm(
         'Please check if the above information is correct.\nDo you want to continue?', abort=True)
 
     if students:
-        students = students.split(",")
+        students = [s.strip() for s in students.split(",")]
     if groups:
-        groups = groups.split(",")
+        groups = [gr.strip() for gr in groups.split(",")]
 
-    click.secho("# Creating student repositories..", fg="green")
-    click.secho("# Source: '{}'".format(source), fg="green")
+    click.secho("# Creating pull request in student repositories..", fg="green")
 
-    g : github.Github = ctx.obj['pyg']
+    g: github.Github = ctx.obj['pyg']
     g_org = g.get_organization(ghtt.config.get_organization())
 
     students = ghtt.config.get_students(usernames=students, groups=groups)
-    repos = ghtt.config.get_repos(students)
+    mentors = ghtt.config.get_mentors()
+    repos = ghtt.config.get_repos(students, mentors=mentors)
 
-    for repo in repos:
+    for repo in repos.values():
         g_repo = g_org.get_repo(repo.name)
-        command = ["git", "push", g_repo.ssh_url, "master:{}".format(branch)]
-        cwd = source
-        print("\nwill run `{}`\nin directory `{}`.".format(command, cwd))
-        if click.confirm('Do you want to continue?'):
-            subprocess.check_call(command, cwd=cwd)
-            pr = g_repo.create_pull(title, "master", branch, body=body)
+        if not branch_already_pushed:
+            command = ["git", "push", g_repo.ssh_url, "master:{}".format(branch)]
+            cwd = source
+            print("\nwill run `{}`\nin directory `{}`.".format(command, cwd))
+            if click.confirm('Do you want to continue?'):
+                if not branch_already_pushed:
+                    subprocess.check_call(command, cwd=cwd)
+                pr = g_repo.create_pull(title, "master", branch, body=body)
+                click.secho("created pull request {}".format(pr.html_url))
+        else:
+            click.secho("Creating pull request in {}".format(repo.name), fg="green")
+            pr = g_repo.create_pull(title=title, body=body, base="master", head=branch)
             click.secho("created pull request {}".format(pr.html_url))
 
 
@@ -137,9 +150,9 @@ def create_repos(ctx, source, students=None, groups=None):
     Note: this command does not grant students access to those repositories. See `assignment grant`.
     """
     if students:
-        students = students.split(",")
+        students = [s.strip() for s in students.split(",")]
     if groups:
-        groups = groups.split(",")
+        groups = [gr.strip() for gr in groups.split(",")]
 
     click.secho("# Creating student repositories..", fg="green")
     click.secho("# Source: '{}'".format(source), fg="green")
@@ -201,9 +214,9 @@ def create_issues(ctx, path, students=None, groups=None):
     """Create issues in the repositories of the specified users and groups.
     """
     if students:
-        students = students.split(",")
+        students = [s.strip() for s in students.split(",")]
     if groups:
-        groups = groups.split(",")
+        groups = [gr.strip() for gr in groups.split(",")]
 
     click.secho("# Creating issues defined in {}...".format(path), fg="green")
 
@@ -277,9 +290,9 @@ def pull(ctx, source, students=None, groups=None):
     """Show the latest commit of each student
     """
     if students:
-        students = students.split(",")
+        students = [s.strip() for s in students.split(",")]
     if groups:
-        groups = groups.split(",")
+        groups = [gr.strip() for gr in groups.split(",")]
 
     click.secho("# Showing the latest commit..", fg="green")
     click.secho("# Path: '{}'".format(source), fg="green")
@@ -330,9 +343,9 @@ def grant(ctx, students=None, groups=None):
     organization specified by the url.
     """
     if students:
-        students = students.split(",")
+        students = [s.strip() for s in students.split(",")]
     if groups:
-        groups = groups.split(",")
+        groups = [gr.strip() for gr in groups.split(",")]
 
     click.secho("# Granting students write permission to their repository..", fg="green")
     click.secho("# Students: '{}'".format(students), fg="green")
@@ -368,9 +381,9 @@ def remove_grant(ctx, students=None, groups=None):
     student.
     """
     if students:
-        students = students.split(",")
+        students = [s.strip() for s in students.split(",")]
     if groups:
-        groups = groups.split(",")
+        groups = [gr.strip() for gr in groups.split(",")]
 
     click.secho("# Removing students write permission to their repository..", fg="green")
     click.secho("# Students: '{}'".format(students), fg="green")
