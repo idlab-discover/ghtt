@@ -49,6 +49,8 @@ def get(keypath: str, default):
     except FileNotFoundError:
         print("ERROR: The config file `ghtt.yaml` was not found in the current directory.")
         exit(1)
+    except KeyError:
+        pass
     return default
 
 
