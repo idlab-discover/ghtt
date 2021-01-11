@@ -91,8 +91,6 @@ def generate_file_from_template(path, clone_url, repo: ghtt.config.StudentRepo):
     `.jinja`, the template file is removed and the result is saved without that extension. If not,
     the template file is overwritten with the generated result.
     """
-    print("TEMPLATE: ", open(path).read())
-
     template = open(path).read()
     outputText = render_template(template, clone_url, repo)
     destination = str(path)
