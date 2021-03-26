@@ -237,7 +237,11 @@ def create_issues(ctx, path, students=None, groups=None):
     for repo in repos.values():
         click.secho("\n\nGenerating issues in repo {}".format(repo.name), fg="green")
 
-        g_repo = g_org.get_repo(repo.name)
+        try:
+            g_repo = g_org.get_repo(repo.name)
+        except UnknownObjectException:
+            click.secho("Warning: repository {} not found, skipping".format(repo.name), fg="red")
+            continue
 
         for issue_template in issue_templates:
             issue_type = issue_template.get('type')
@@ -362,8 +366,13 @@ def grant(ctx, students=None, groups=None):
 
 
     for repo in repos.values():
-        g_repo = g_org.get_repo(repo.name)
+        try:
+            g_repo = g_org.get_repo(repo.name)
+        except UnknownObjectException:
+            click.secho("Warning: repository {} not found, skipping".format(repo.name), fg="red")
+            continue
         click.secho("Adding the student as collaborator", fg="green")
+        continue
         for student in repo.students:
             g_repo.add_to_collaborators(student.username)
 
