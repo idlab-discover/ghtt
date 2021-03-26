@@ -259,8 +259,8 @@ def create_issues(ctx, path, students=None, groups=None):
                 click.secho("Adding issue with title '{}'".format(issue_template.get('title')), fg="green")
 
                 # find the milestone, if any
-                milestone = issue_template.get('milestone', None)
-                if milestone is not None:
+                milestone = issue_template.get('milestone', github.GithubObject.NotSet)
+                if milestone is not github.GithubObject.NotSet:
                     milestone = [ms for ms in g_repo.get_milestones() if ms.title == milestone][0]
 
                 g_repo.create_issue(
