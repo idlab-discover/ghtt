@@ -152,12 +152,12 @@ def create_repos(ctx, source, students=None, groups=None):
     repos = ghtt.config.get_repos(students, mentors=mentors)
 
     for repo in repos.values():
-        click.secho("\n\nGenerating repo {}".format(repo.name), fg="green")
-
         try:
             g_repo = g_org.create_repo(repo.name, private=True)
+            click.secho("\n\nGenerating repo {}".format(repo.name), fg="green")
         except github.GithubException:
-            g_repo = g_org.get_repo(repo.name)
+            click.secho("WARNING: Repository {} already exists; skipping..".format(repo.name), fg="red")
+            continue
 
         subprocess.check_call(["git", "checkout", "master"], cwd=source)
         subprocess.call(["git", "branch", "-D", repo.name], cwd=source)
