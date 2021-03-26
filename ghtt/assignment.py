@@ -10,6 +10,7 @@ import click
 import requests
 import yaml
 from github import Repository
+from github.GithubException import UnknownObjectException
 from tabulate import tabulate
 import jinja2
 import github
@@ -294,20 +295,24 @@ def pull(ctx, source, students=None, groups=None):
 
     try:
         for repo in repos.values():
-            g_repo = g_org.get_repo(repo.name)
+            try:
+                g_repo = g_org.get_repo(repo.name)
 
-            subprocess.check_call(["git", "checkout", repo.name], cwd=source)
-            subprocess.check_call(
-                ["git", "pull", g_repo.ssh_url, "master:{}".format(repo.name)], cwd=source)
+                subprocess.check_call(
+                    ["git", "fetch", g_repo.ssh_url, "master:{}".format(g_repo.name)], cwd=source)
 
-            timestamp = subprocess.check_output(["git", "log", "-1", "--pretty=format:%ct"], cwd=source, universal_newlines=True).rstrip()
-            commit_summary = subprocess.check_output(["git", "log", "-1", "--pretty=format:%s"], cwd=source, universal_newlines=True)
-            committer = subprocess.check_output(["git", "log", "-1", "--pretty=format:%an <%ae>"], cwd=source, universal_newlines=True)
+                # subprocess.check_call(["git", "checkout", g_repo.name], cwd=source)
+                timestamp = subprocess.check_output(["git", "log", g_repo.name, "-1", "--pretty=format:%ct"], cwd=source, universal_newlines=True).rstrip()
+                commit_summary = subprocess.check_output(["git", "log", g_repo.name, "-1", "--pretty=format:%s"], cwd=source, universal_newlines=True)
+                committer = subprocess.check_output(["git", "log", g_repo.name, "-1", "--pretty=format:%an <%ae>"], cwd=source, universal_newlines=True)
 
-            commit_time = datetime.fromtimestamp(int(timestamp))
-            summary.append((repo.name, repo.comment, commit_time, committer, commit_summary))
+                commit_time = datetime.fromtimestamp(int(timestamp))
+                summary.append((g_repo.name, g_repo.description, commit_time, committer, commit_summary))
+            except UnknownObjectException:
+                summary.append((repo.name, repo.comment, datetime.now(), None, "pull failed: repository not found"))
+            except subprocess.CalledProcessError:
+                summary.append((g_repo.name, g_repo.description, datetime.now(), None, "pull failed; see output above"))
     finally:
-        subprocess.check_call(["git", "checkout", "master"], cwd=source)
         summary.sort(key=lambda tup: tup[2])
         click.secho(tabulate(summary, headers=['Username', "Description", 'Last commit time', "Committer info", 'Commit summary']))
 
