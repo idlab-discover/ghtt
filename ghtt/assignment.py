@@ -84,7 +84,11 @@ def create_pr(ctx, branch, title, body, source, students=None, groups=None, bran
     repos = ghtt.config.get_repos(students, mentors=mentors)
 
     for repo in repos.values():
-        g_repo = g_org.get_repo(repo.name)
+        try:
+            g_repo = g_org.get_repo(repo.name)
+        except UnknownObjectException:
+            click.secho("Warning: repository {}/{} not found, skipping".format(g_org.html_url, repo.name), fg="red")
+            continue
         if not branch_already_pushed:
             command = ["git", "push", g_repo.ssh_url, "master:{}".format(branch)]
             cwd = source
@@ -165,11 +169,14 @@ def create_repos(ctx, source, students=None, groups=None):
     repos = ghtt.config.get_repos(students, mentors=mentors)
 
     for repo in repos.values():
+        # if len(repo.students) != 2:
+        #     continue
+
         try:
             g_repo = g_org.create_repo(repo.name, private=True)
-            click.secho("\n\nGenerating repo {}".format(repo.name), fg="green")
+            click.secho("\n\nGenerating repo {}/{}".format(g_org.html_url, repo.name), fg="green")
         except github.GithubException:
-            click.secho("WARNING: Repository {} already exists; skipping..".format(repo.name), fg="red")
+            click.secho("WARNING: Repository {}/{} already exists; skipping..".format(g_org.html_url, repo.name), fg="red")
             continue
 
         subprocess.check_call(["git", "checkout", "master"], cwd=source)
@@ -235,12 +242,12 @@ def create_issues(ctx, path, students=None, groups=None):
     repos = ghtt.config.get_repos(students, mentors=mentors)
 
     for repo in repos.values():
-        click.secho("\n\nGenerating issues in repo {}".format(repo.name), fg="green")
+        click.secho("\n\nGenerating issues in repo {}/{}".format(g_org.html_url, repo.name), fg="green")
 
         try:
             g_repo = g_org.get_repo(repo.name)
         except UnknownObjectException:
-            click.secho("Warning: repository {} not found, skipping".format(repo.name), fg="red")
+            click.secho("Warning: repository {}/{} not found, skipping".format(g_org.html_url, repo.name), fg="red")
             continue
 
         for issue_template in issue_templates:
@@ -369,10 +376,9 @@ def grant(ctx, students=None, groups=None):
         try:
             g_repo = g_org.get_repo(repo.name)
         except UnknownObjectException:
-            click.secho("Warning: repository {} not found, skipping".format(repo.name), fg="red")
+            click.secho("Warning: repository {}/{} not found, skipping".format(g_org.html_url, repo.name), fg="red")
             continue
         click.secho("Adding the student as collaborator", fg="green")
-        continue
         for student in repo.students:
             g_repo.add_to_collaborators(student.username)
 
@@ -404,7 +410,11 @@ def remove_grant(ctx, students=None, groups=None):
     repos = ghtt.config.get_repos(students)
 
     for repo in repos.values():
-        g_repo = g_org.get_repo(repo.name)
+        try:
+            g_repo = g_org.get_repo(repo.name)
+        except UnknownObjectException:
+            click.secho("Warning: repository {}/{} not found, skipping".format(g_org.html_url, repo.name), fg="red")
+            continue
         # Delete open invitations for that user
         # Do this before removing as collaborator so we don't get a race condition where
         # student accepts invitation between the remove as collaborator and the remove
