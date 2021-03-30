@@ -18,6 +18,40 @@ import github
 from .auth import needs_auth
 import ghtt.config
 
+
+def _check_repo_groups(repos: Dict[str, StudentRepo]) -> Dict[str, StudentRepo]:
+    # Check if all repo's have expected number of students/mentors
+    ok_repos = {}
+    expected_group_count = ghtt.config.get('expected_group_count', 1)
+    expected_mentor_count = ghtt.config.get('expected_mentor_count', 0)
+    for repname, repo in repos.items():
+        count_expected = True
+        if expected_group_count and len(repo.students) != expected_group_count:
+            count_expected = False
+        if expected_mentor_count and len(repo.mentors) != expected_mentor_count:
+            count_expected = False
+        if count_expected:
+            ok_repos[repname] = repo
+        else:
+            if expected_mentor_count or repo.mentors:
+                click.secho("Group {} has {} students and {} mentors (expected {}/{}):"
+                            .format(repo.group, len(repo.students), len(repo.mentors),
+                                    expected_group_count, expected_mentor_count))
+            else:
+                click.secho("Group {} has {} students (expected {}):"
+                            .format(repo.group, len(repo.students), expected_group_count))
+            for stud in repo.students:
+                click.secho('   - student {} ({})'.format(stud.username, stud.comment))
+            for ment in repo.mentors:
+                click.secho('   - mentor {} ({})'.format(ment.username, ment.comment))
+            if click.confirm('Include {}'.format(repo.group), default=False):
+                print("Explicitly including {}".format(repo.group))
+                ok_repos[repname] = repo
+            else:
+                print("Skipping {}".format(repo.group))
+    return ok_repos
+
+
 @click.group()
 @needs_auth
 @click.pass_context
@@ -82,6 +116,7 @@ def create_pr(ctx, branch, title, body, source, students=None, groups=None, bran
     students = ghtt.config.get_students(usernames=students, groups=groups)
     mentors = ghtt.config.get_mentors()
     repos = ghtt.config.get_repos(students, mentors=mentors)
+    repos = _check_repo_groups(repos) if not yes else repos
 
     for repo in repos.values():
         try:
@@ -172,11 +207,9 @@ def create_repos(ctx, source, students=None, groups=None):
     students = ghtt.config.get_students(usernames=students, groups=groups)
     mentors = ghtt.config.get_mentors()
     repos = ghtt.config.get_repos(students, mentors=mentors)
+    repos = _check_repo_groups(repos) if not yes else repos
 
     for repo in repos.values():
-        # if len(repo.students) != 2:
-        #     continue
-
         try:
             g_repo = g_org.create_repo(repo.name, private=True)
             click.secho("\n\nGenerating repo {}/{}".format(g_org.html_url, repo.name), fg="green")
@@ -245,6 +278,7 @@ def create_issues(ctx, path, students=None, groups=None):
     students = ghtt.config.get_students(usernames=students, groups=groups)
     mentors = ghtt.config.get_mentors()
     repos = ghtt.config.get_repos(students, mentors=mentors)
+    repos = _check_repo_groups(repos) if not yes else repos
 
     for repo in repos.values():
         click.secho("\n\nGenerating issues in repo {}/{}".format(g_org.html_url, repo.name), fg="green")
@@ -318,7 +352,7 @@ def pull(ctx, source, students=None, groups=None):
     g_org = g.get_organization(ghtt.config.get_organization())
     
     students = ghtt.config.get_students(usernames=students, groups=groups)
-    repos = ghtt.config.get_repos(students)
+    repos = ghtt.config.get_repos(students, mentors=ghtt.config.get_mentors())
 
     summary = []
 
@@ -373,7 +407,7 @@ def grant(ctx, students=None, groups=None):
     for student in students:
         print(student.username, student.group)
 
-    repos = ghtt.config.get_repos(students)
+    repos = ghtt.config.get_repos(students, mentors=ghtt.config.get_mentors())
 
 
 
@@ -412,7 +446,7 @@ def remove_grant(ctx, students=None, groups=None):
     g_org = g.get_organization(ghtt.config.get_organization())
     
     students = ghtt.config.get_students(usernames=students, groups=groups)
-    repos = ghtt.config.get_repos(students)
+    repos = ghtt.config.get_repos(students, mentors=ghtt.config.get_mentors())
 
     for repo in repos.values():
         try:

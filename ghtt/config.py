@@ -5,6 +5,7 @@ import re
 from typing import List, Dict, Optional
 from urllib.parse import urlparse
 
+import click
 from jinja2 import Template
 import yaml
 
@@ -111,10 +112,12 @@ def get_organization() -> str:
 def get_repos(students: List[Person], mentors: Optional[List[Person]] = None) -> Dict[str, StudentRepo]:
     if mentors is None:
         mentors = []
+    print('get_repos with {} students and {} mentors'.format(len(students), len(mentors)))
     repos = {}
     student_config = get("students", None)
-    if not student_config:
-        return students
+    # if not student_config:
+    # return students  # wrong type
+    assert student_config
     mapping = student_config['field-mapping']
 
     organization = get_organization()
@@ -140,6 +143,7 @@ def get_repos(students: List[Person], mentors: Optional[List[Person]] = None) ->
         repo.organization = organization
         repo.mentors = [m for m in mentors if repo.group in m.groups]
         repos[repo.name] = repo
+
     return repos
 
 
