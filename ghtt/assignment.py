@@ -17,6 +17,38 @@ import github
 
 from .auth import needs_auth
 import ghtt.config
+from ghtt.config import StudentRepo
+
+
+class AbortGhtt(Exception):
+    pass
+
+
+class ContinueHandler:
+    def __init__(self, auto_mode: bool, action: str):
+        self.auto_mode = auto_mode
+        self.action = action
+
+    def must_skip_repo(self, repo: StudentRepo) -> bool:
+        if self.auto_mode:
+            return False
+
+        user_choice = click.prompt(f'Do you want to {self.action} in {repo.name}?',
+                                   default=None, show_choices=True,
+                                   type=click.Choice(['y', 'All', 'Skip', 'Abort'], case_sensitive=False))
+        if user_choice == 'y':
+            return False
+        elif user_choice == 'All':
+            self.auto_mode = True
+            return False
+        elif user_choice == 'Skip':
+            click.secho('Skipping {}'.format(repo.name), fg="yellow")
+            return True
+        elif user_choice == 'Abort':
+            click.secho('Aborting!', fg="red")
+            raise AbortGhtt()
+        else:
+            assert False, f'Unknown choice {user_choice!r}'  # should not occur
 
 
 def _check_repo_groups(repos: Dict[str, StudentRepo]) -> Dict[str, StudentRepo]:
@@ -87,7 +119,10 @@ def assignment(ctx):
 @click.option(
     '--groups',
     help='Comma-separated list of group names. Defaults to all groups.')
-def create_pr(ctx, branch, title, body, source, students=None, groups=None, branch_already_pushed=False):
+@click.option(
+    '--yes',
+    help='Process all students/groups, without confirmation.', is_flag=True)
+def create_pr(ctx, branch, title, body, source, yes, students=None, groups=None, branch_already_pushed=False):
     """Pushes updated code to a new branch on students repositories and creates a pr to merge that
     branch into master.
     """
@@ -118,6 +153,8 @@ def create_pr(ctx, branch, title, body, source, students=None, groups=None, bran
     repos = ghtt.config.get_repos(students, mentors=mentors)
     repos = _check_repo_groups(repos) if not yes else repos
 
+    continue_handler = ContinueHandler(auto_mode=yes, action='create the PR')
+
     for repo in repos.values():
         try:
             g_repo = g_org.get_repo(repo.name)
@@ -128,12 +165,14 @@ def create_pr(ctx, branch, title, body, source, students=None, groups=None, bran
             command = ["git", "push", g_repo.ssh_url, "master:{}".format(branch)]
             cwd = source
             print("\nwill run `{}`\nin directory `{}`.".format(command, cwd))
-            if click.confirm('Do you want to continue?'):
-                if not branch_already_pushed:
-                    subprocess.check_call(command, cwd=cwd)
-                pr = g_repo.create_pull(title, "master", branch, body=body)
-                click.secho("created pull request {}".format(pr.html_url))
+            if continue_handler.must_skip_repo(repo):
+                continue
+            subprocess.check_call(command, cwd=cwd)
+            pr = g_repo.create_pull(title=title, body=body, base="master", head=branch)
+            click.secho("created pull request {}".format(pr.html_url))
         else:
+            if continue_handler.must_skip_repo(repo):
+                continue
             click.secho("Creating pull request in {}".format(repo.name), fg="green")
             pr = g_repo.create_pull(title=title, body=body, base="master", head=branch)
             click.secho("created pull request {}".format(pr.html_url))
@@ -186,7 +225,10 @@ def render_template(template: str, clone_url, repo: ghtt.config.StudentRepo) -> 
 @click.option(
     '--groups',
     help='Comma-separated list of group names. Defaults to all groups.')
-def create_repos(ctx, source, students=None, groups=None):
+@click.option(
+    '--yes',
+    help='Process all students/groups, without confirmation.', is_flag=True)
+def create_repos(ctx, source, yes, students=None, groups=None):
     """Create student repositories in the organization specified by the url.
     Each repository will contain a copy of the specified source and will have force-pushing disabled
     so students can not rewrite history.
@@ -209,7 +251,12 @@ def create_repos(ctx, source, students=None, groups=None):
     repos = ghtt.config.get_repos(students, mentors=mentors)
     repos = _check_repo_groups(repos) if not yes else repos
 
+    continue_handler = ContinueHandler(auto_mode=yes, action='create the repo')
+
     for repo in repos.values():
+        if continue_handler.must_skip_repo(repo):
+            continue
+
         try:
             g_repo = g_org.create_repo(repo.name, private=True)
             click.secho("\n\nGenerating repo {}/{}".format(g_org.html_url, repo.name), fg="green")
@@ -234,7 +281,7 @@ def create_repos(ctx, source, students=None, groups=None):
         click.secho("Pushing source to {}".format(g_repo.ssh_url), fg="green")
         subprocess.check_call(["git", "push", g_repo.ssh_url, "{}:master".format(repo.name)], cwd=source)
         subprocess.check_call(["git", "checkout", "master"], cwd=source)
-        
+
         click.secho("Protecting the master branch so students can't rewrite history", fg="green")
         g_repo = g_org.get_repo(repo.name)
         g_master = g_repo.get_branch("master")
@@ -255,7 +302,10 @@ def create_repos(ctx, source, students=None, groups=None):
 @click.option(
     "--groups",
     help="Comma-separated list of group names. Defaults to all groups.")
-def create_issues(ctx, path, students=None, groups=None):
+@click.option(
+    '--yes',
+    help='Process all students/groups, without confirmation.', is_flag=True)
+def create_issues(ctx, path, yes, students=None, groups=None):
     """Create issues in the repositories of the specified users and groups.
     """
     if students:
@@ -280,14 +330,19 @@ def create_issues(ctx, path, students=None, groups=None):
     repos = ghtt.config.get_repos(students, mentors=mentors)
     repos = _check_repo_groups(repos) if not yes else repos
 
-    for repo in repos.values():
-        click.secho("\n\nGenerating issues in repo {}/{}".format(g_org.html_url, repo.name), fg="green")
+    continue_handler = ContinueHandler(auto_mode=yes, action='create the issue(s)')
 
+    for repo in repos.values():
         try:
             g_repo = g_org.get_repo(repo.name)
         except UnknownObjectException:
             click.secho("Warning: repository {}/{} not found, skipping".format(g_org.html_url, repo.name), fg="red")
             continue
+
+        if continue_handler.must_skip_repo(repo):
+            continue
+
+        click.secho("\n\nGenerating issues in repo {}/{}".format(g_org.html_url, repo.name), fg="green")
 
         for issue_template in issue_templates:
             issue_type = issue_template.get('type')
@@ -303,7 +358,7 @@ def create_issues(ctx, path, students=None, groups=None):
                     if len(e.data["errors"]) != 1  or e.data["errors"][0]["code"] != "already_exists":
                         raise
 
-                    
+
 
             elif issue_type == 'issue':
                 click.secho("Adding issue with title '{}'".format(issue_template.get('title')), fg="green")
@@ -336,7 +391,10 @@ def create_issues(ctx, path, students=None, groups=None):
 @click.option(
     '--groups',
     help='Comma-separated list of group names. Defaults to all groups.')
-def pull(ctx, source, students=None, groups=None):
+@click.option(
+    '--yes',
+    help='Process all students/groups, without confirmation.', is_flag=True)
+def pull(ctx, source, yes, students=None, groups=None):
     """Show the latest commit of each student
     """
     if students:
@@ -356,8 +414,19 @@ def pull(ctx, source, students=None, groups=None):
 
     summary = []
 
+    continue_handler = ContinueHandler(auto_mode=yes, action='pull')
+
     try:
         for repo in repos.values():
+            try:
+                g_repo = g_org.get_repo(repo.name)
+            except UnknownObjectException:
+                summary.append((repo.name, repo.comment, datetime.now(), None, "pull failed: repository not found"))
+                continue
+
+            if continue_handler.must_skip_repo(repo):
+                continue
+
             try:
                 g_repo = g_org.get_repo(repo.name)
 
@@ -371,8 +440,6 @@ def pull(ctx, source, students=None, groups=None):
 
                 commit_time = datetime.fromtimestamp(int(timestamp))
                 summary.append((g_repo.name, g_repo.description, commit_time, committer, commit_summary))
-            except UnknownObjectException:
-                summary.append((repo.name, repo.comment, datetime.now(), None, "pull failed: repository not found"))
             except subprocess.CalledProcessError:
                 summary.append((g_repo.name, g_repo.description, datetime.now(), None, "pull failed; see output above"))
     finally:
@@ -388,7 +455,10 @@ def pull(ctx, source, students=None, groups=None):
 @click.option(
     '--groups',
     help='Comma-separated list of group names. Defaults to all groups.')
-def grant(ctx, students=None, groups=None):
+@click.option(
+    '--yes',
+    help='Process all students/groups, without confirmation.', is_flag=True)
+def grant(ctx, yes, students=None, groups=None):
     """Grant each student push access (the collaborator role) to their repository in the
     organization specified by the url.
     """
@@ -409,7 +479,7 @@ def grant(ctx, students=None, groups=None):
 
     repos = ghtt.config.get_repos(students, mentors=ghtt.config.get_mentors())
 
-
+    continue_handler = ContinueHandler(auto_mode=yes, action='grant')
 
     for repo in repos.values():
         try:
@@ -417,6 +487,10 @@ def grant(ctx, students=None, groups=None):
         except UnknownObjectException:
             click.secho("Warning: repository {}/{} not found, skipping".format(g_org.html_url, repo.name), fg="red")
             continue
+
+        if continue_handler.must_skip_repo(repo):
+            continue
+
         click.secho("Adding the student as collaborator", fg="green")
         for student in repo.students:
             g_repo.add_to_collaborators(student.username)
@@ -430,7 +504,10 @@ def grant(ctx, students=None, groups=None):
 @click.option(
     '--groups',
     help='Comma-separated list of group names. Defaults to all groups.')
-def remove_grant(ctx, students=None, groups=None):
+@click.option(
+    '--yes',
+    help='Process all students/groups, without confirmation.', is_flag=True)
+def remove_grant(ctx, yes, students=None, groups=None):
     """Removes students' push access to their repository and cancels any open invitation for that
     student.
     """
@@ -448,12 +525,18 @@ def remove_grant(ctx, students=None, groups=None):
     students = ghtt.config.get_students(usernames=students, groups=groups)
     repos = ghtt.config.get_repos(students, mentors=ghtt.config.get_mentors())
 
+    continue_handler = ContinueHandler(auto_mode=yes, action='remove grant')
+
     for repo in repos.values():
         try:
             g_repo = g_org.get_repo(repo.name)
         except UnknownObjectException:
             click.secho("Warning: repository {}/{} not found, skipping".format(g_org.html_url, repo.name), fg="red")
             continue
+
+        if continue_handler.must_skip_repo(repo):
+            continue
+
         # Delete open invitations for that user
         # Do this before removing as collaborator so we don't get a race condition where
         # student accepts invitation between the remove as collaborator and the remove
