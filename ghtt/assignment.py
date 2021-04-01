@@ -14,6 +14,7 @@ from github.GithubException import UnknownObjectException
 from tabulate import tabulate
 import jinja2
 import github
+from pathlib import Path
 
 from .auth import needs_auth
 import ghtt.config
@@ -24,63 +25,69 @@ class AbortGhtt(Exception):
     pass
 
 
-class ContinueHandler:
-    def __init__(self, auto_mode: bool, action: str):
-        self.auto_mode = auto_mode
+class ProceedAsker:
+    def __init__(self, yes: bool, action: str):
+        self.auto_mode = "all" if yes else None
         self.action = action
 
-    def must_skip_repo(self, repo: StudentRepo) -> bool:
-        if self.auto_mode:
+    def should_proceed(self, subject: str) -> bool:
+        assert(self.auto_mode in ["all", "none", None])
+        if self.auto_mode == "all":
+            return True
+        elif self.auto_mode == "none":
             return False
 
-        user_choice = click.prompt(f'Do you want to {self.action} in {repo.name}?',
+        user_choice = click.prompt(f'Do you want to {self.action} "{subject}"?',
                                    default=None, show_choices=True,
-                                   type=click.Choice(['y', 'All', 'Skip', 'Abort'], case_sensitive=False))
+                                   type=click.Choice(['y', 'all', 'n', 'none', 'abort'], case_sensitive=False))
         if user_choice == 'y':
-            return False
-        elif user_choice == 'All':
-            self.auto_mode = True
-            return False
-        elif user_choice == 'Skip':
-            click.secho('Skipping {}'.format(repo.name), fg="yellow")
             return True
-        elif user_choice == 'Abort':
+        elif user_choice == 'all':
+            self.auto_mode = "all"
+            return True
+        elif user_choice == 'n':
+            click.secho('Skipping {}'.format(subject), fg="yellow")
+            return False
+        elif user_choice == 'none':
+            self.auto_mode = 'none'
+            return False
+        elif user_choice == 'abort':
             click.secho('Aborting!', fg="red")
             raise AbortGhtt()
         else:
             assert False, f'Unknown choice {user_choice!r}'  # should not occur
 
 
-def _check_repo_groups(repos: Dict[str, StudentRepo]) -> Dict[str, StudentRepo]:
+def _check_repo_groups(yes: bool, repos: Dict[str, StudentRepo]) -> Dict[str, StudentRepo]:
     # Check if all repo's have expected number of students/mentors
     ok_repos = {}
-    expected_group_count = ghtt.config.get('expected_group_count', 1)
-    expected_mentor_count = ghtt.config.get('expected_mentor_count', 0)
+    expected_group_size = ghtt.config.get('expected-group-size', 1)
+    expected_mentor_count = ghtt.config.get('expected-mentors-per-group', 0)
+
+    asker = ProceedAsker(yes=False, action='proceed with invalid group')
+
     for repname, repo in repos.items():
-        count_expected = True
-        if expected_group_count and len(repo.students) != expected_group_count:
-            count_expected = False
-        if expected_mentor_count and len(repo.mentors) != expected_mentor_count:
-            count_expected = False
-        if count_expected:
-            ok_repos[repname] = repo
-        else:
+        if (
+                (expected_group_size and len(repo.students) != expected_group_size)
+                or (expected_mentor_count and len(repo.mentors) != expected_mentor_count)
+           ):
             if expected_mentor_count or repo.mentors:
                 click.secho("Group {} has {} students and {} mentors (expected {}/{}):"
                             .format(repo.group, len(repo.students), len(repo.mentors),
-                                    expected_group_count, expected_mentor_count))
+                                    expected_group_size, expected_mentor_count))
             else:
                 click.secho("Group {} has {} students (expected {}):"
-                            .format(repo.group, len(repo.students), expected_group_count))
+                            .format(repo.group, len(repo.students), expected_group_size))
             for stud in repo.students:
                 click.secho('   - student {} ({})'.format(stud.username, stud.comment))
             for ment in repo.mentors:
                 click.secho('   - mentor {} ({})'.format(ment.username, ment.comment))
-            if click.confirm('Include {}'.format(repo.group), default=False):
-                print("Explicitly including {}".format(repo.group))
+
+            if asker.should_proceed(repo.group):
                 ok_repos[repname] = repo
-            else:
-                print("Skipping {}".format(repo.group))
+        else:
+            ok_repos[repname] = repo
+
     return ok_repos
 
 
@@ -151,28 +158,28 @@ def create_pr(ctx, branch, title, body, source, yes, students=None, groups=None,
     students = ghtt.config.get_students(usernames=students, groups=groups)
     mentors = ghtt.config.get_mentors()
     repos = ghtt.config.get_repos(students, mentors=mentors)
-    repos = _check_repo_groups(repos) if not yes else repos
+    repos = _check_repo_groups(yes=yes, repos=repos)
 
-    continue_handler = ContinueHandler(auto_mode=yes, action='create the PR')
+    asker = ProceedAsker(yes=yes, action='create the PR for')
 
     for repo in repos.values():
         try:
             g_repo = g_org.get_repo(repo.name)
         except UnknownObjectException:
-            click.secho("Warning: repository {}/{} not found, skipping".format(g_org.html_url, repo.name), fg="red")
+            click.secho("Warning: repository {} not found, skipping".format(repo.url), fg="yellow")
             continue
+        if not asker.should_proceed(repo.url):
+            continue
+
         if not branch_already_pushed:
             command = ["git", "push", g_repo.ssh_url, "master:{}".format(branch)]
             cwd = source
-            print("\nwill run `{}`\nin directory `{}`.".format(command, cwd))
-            if continue_handler.must_skip_repo(repo):
-                continue
+            click.secho("\nwill run `{}`\nin directory `{}`.".format(command, cwd))
+
             subprocess.check_call(command, cwd=cwd)
             pr = g_repo.create_pull(title=title, body=body, base="master", head=branch)
             click.secho("created pull request {}".format(pr.html_url))
         else:
-            if continue_handler.must_skip_repo(repo):
-                continue
             click.secho("Creating pull request in {}".format(repo.name), fg="green")
             pr = g_repo.create_pull(title=title, body=body, base="master", head=branch)
             click.secho("created pull request {}".format(pr.html_url))
@@ -183,7 +190,6 @@ def generate_file_from_template(path, clone_url, repo: ghtt.config.StudentRepo):
     `.jinja`, the template file is removed and the result is saved without that extension. If not,
     the template file is overwritten with the generated result.
     """
-    print("TEMPLATE: ", open(path).read())
     try:
         template = open(path).read()
         outputText = render_template(template, clone_url, repo)
@@ -207,11 +213,6 @@ def render_template(template: str, clone_url, repo: ghtt.config.StudentRepo) -> 
         mentors=repo.mentors,
     )
 
-#%%
-# template = open("/home/merlijn/PHD/SYSPROG/project/sysprog-2020-opgave-code-studenten/README.md.jinja").read()
-
-
-#%%
 
 @assignment.command()
 @click.pass_context
@@ -249,27 +250,27 @@ def create_repos(ctx, source, yes, students=None, groups=None):
     students = ghtt.config.get_students(usernames=students, groups=groups)
     mentors = ghtt.config.get_mentors()
     repos = ghtt.config.get_repos(students, mentors=mentors)
-    repos = _check_repo_groups(repos) if not yes else repos
+    repos = _check_repo_groups(yes=yes, repos=repos)
 
-    continue_handler = ContinueHandler(auto_mode=yes, action='create the repo')
+    asker = ProceedAsker(yes=yes, action='create the repo')
 
     for repo in repos.values():
-        if continue_handler.must_skip_repo(repo):
+        try:
+            g_repo = g_org.get_repo(repo.name)
+            click.secho("Warning: repository {}/{} already exists; skipping..".format(g_org.html_url, repo.name), fg="yellow")
+            continue
+        except UnknownObjectException:
+            pass
+        if not asker.should_proceed(repo.url):
             continue
 
-        try:
-            g_repo = g_org.create_repo(repo.name, private=True)
-            click.secho("\n\nGenerating repo {}/{}".format(g_org.html_url, repo.name), fg="green")
-        except github.GithubException:
-            click.secho("WARNING: Repository {}/{} already exists; skipping..".format(g_org.html_url, repo.name), fg="red")
-            continue
+        g_repo = g_org.create_repo(repo.name, private=True)
+
+        click.secho("\n\nGenerating repo {}/{}".format(g_org.html_url, repo.name), fg="green")
 
         subprocess.check_call(["git", "checkout", "master"], cwd=source)
         subprocess.call(["git", "branch", "-D", repo.name], cwd=source)
         subprocess.check_call(["git", "checkout", "-b", repo.name], cwd=source)
-
-
-        from pathlib import Path
 
         for path in Path(source).rglob('*.jinja'):
             generate_file_from_template(
@@ -328,18 +329,17 @@ def create_issues(ctx, path, yes, students=None, groups=None):
     students = ghtt.config.get_students(usernames=students, groups=groups)
     mentors = ghtt.config.get_mentors()
     repos = ghtt.config.get_repos(students, mentors=mentors)
-    repos = _check_repo_groups(repos) if not yes else repos
+    repos = _check_repo_groups(yes=yes, repos=repos)
 
-    continue_handler = ContinueHandler(auto_mode=yes, action='create the issue(s)')
+    asker = ProceedAsker(yes=yes, action='create the issue(s) for')
 
     for repo in repos.values():
         try:
             g_repo = g_org.get_repo(repo.name)
         except UnknownObjectException:
-            click.secho("Warning: repository {}/{} not found, skipping".format(g_org.html_url, repo.name), fg="red")
+            click.secho("Warning: repository {} not found, skipping".format(repo.url), fg="yellow")
             continue
-
-        if continue_handler.must_skip_repo(repo):
+        if not asker.should_proceed(repo.url):
             continue
 
         click.secho("\n\nGenerating issues in repo {}/{}".format(g_org.html_url, repo.name), fg="green")
@@ -414,7 +414,7 @@ def pull(ctx, source, yes, students=None, groups=None):
 
     summary = []
 
-    continue_handler = ContinueHandler(auto_mode=yes, action='pull')
+    asker = ProceedAsker(yes=yes, action='pull')
 
     try:
         for repo in repos.values():
@@ -424,7 +424,7 @@ def pull(ctx, source, yes, students=None, groups=None):
                 summary.append((repo.name, repo.comment, datetime.now(), None, "pull failed: repository not found"))
                 continue
 
-            if continue_handler.must_skip_repo(repo):
+            if not asker.should_proceed(repo.url):
                 continue
 
             try:
@@ -474,21 +474,17 @@ def grant(ctx, yes, students=None, groups=None):
     g_org = g.get_organization(ghtt.config.get_organization())
     
     students = ghtt.config.get_students(usernames=students, groups=groups)
-    for student in students:
-        print(student.username, student.group)
-
     repos = ghtt.config.get_repos(students, mentors=ghtt.config.get_mentors())
 
-    continue_handler = ContinueHandler(auto_mode=yes, action='grant')
+    asker = ProceedAsker(yes=yes, action='grant')
 
     for repo in repos.values():
         try:
             g_repo = g_org.get_repo(repo.name)
         except UnknownObjectException:
-            click.secho("Warning: repository {}/{} not found, skipping".format(g_org.html_url, repo.name), fg="red")
+            click.secho("Warning: repository {} not found, skipping".format(repo.url), fg="yellow")
             continue
-
-        if continue_handler.must_skip_repo(repo):
+        if not asker.should_proceed(repo.url):
             continue
 
         click.secho("Adding the student as collaborator", fg="green")
@@ -525,16 +521,15 @@ def remove_grant(ctx, yes, students=None, groups=None):
     students = ghtt.config.get_students(usernames=students, groups=groups)
     repos = ghtt.config.get_repos(students, mentors=ghtt.config.get_mentors())
 
-    continue_handler = ContinueHandler(auto_mode=yes, action='remove grant')
+    asker = ProceedAsker(yes=yes, action='remove grants from')
 
     for repo in repos.values():
         try:
             g_repo = g_org.get_repo(repo.name)
         except UnknownObjectException:
-            click.secho("Warning: repository {}/{} not found, skipping".format(g_org.html_url, repo.name), fg="red")
+            click.secho("Warning: repository {} not found, skipping".format(repo.url), fg="yellow")
             continue
-
-        if continue_handler.must_skip_repo(repo):
+        if not asker.should_proceed(repo.url):
             continue
 
         # Delete open invitations for that user

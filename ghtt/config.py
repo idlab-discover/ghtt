@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 import click
 from jinja2 import Template
+from natsort import natsorted
 import yaml
 
 
@@ -38,6 +39,7 @@ class StudentRepo:
         self.mentors: List[Person] = []
         self.organization = ""
         self.group = None
+        self.url = ""
 
 
 def get(keypath: str, default):
@@ -49,7 +51,7 @@ def get(keypath: str, default):
             item = item[key]
         return item
     except FileNotFoundError:
-        print("ERROR: The config file `ghtt.yaml` was not found in the current directory.")
+        click.secho("ERROR: The config file `ghtt.yaml` was not found in the current directory.")
         exit(1)
     except KeyError:
         pass
@@ -91,14 +93,13 @@ def get_persons(persons_config: dict, usernames: List[str] = [], groups: List[st
                     person.groups = [canonize_group(group) for group in person.groups]
                 persons.append(person)
     except FileNotFoundError:
-        print("The student database '{}' was not found".format(persons_config['source']))
+        click.secho("The student database '{}' was not found".format(persons_config['source']))
         return persons
     return persons
 
 
 def get_students(usernames: List[str] = [], groups: List[str] = []) -> List[Person]:
     student_config = get("students", None)
-    from natsort import natsorted
     return natsorted(get_persons(student_config, usernames, groups), key=attrgetter('group', 'username'))
 
 
@@ -114,7 +115,7 @@ def get_organization() -> str:
 def get_repos(students: List[Person], mentors: Optional[List[Person]] = None) -> Dict[str, StudentRepo]:
     if mentors is None:
         mentors = []
-    print('get_repos with {} students and {} mentors'.format(len(students), len(mentors)))
+    click.secho('get_repos with {} students and {} mentors'.format(len(students), len(mentors)))
     repos = {}
     student_config = get("students", None)
     # if not student_config:
@@ -127,7 +128,7 @@ def get_repos(students: List[Person], mentors: Optional[List[Person]] = None) ->
     for student in students:
         if mapping.get("group"):
             if not student.group:
-                print("{} is not a member of any group; skipping.".format(student.username))
+                click.secho("{} is not a member of any group; skipping.".format(student.username))
                 continue
             reponame = "{}-{}".format(
                 organization,
@@ -143,27 +144,8 @@ def get_repos(students: List[Person], mentors: Optional[List[Person]] = None) ->
         repo.group = student.group
         repo.comment = ", ".join([s.comment for s in repo.students])
         repo.organization = organization
+        repo.url = "{}/{}".format(get("url", None), repo.name)
         repo.mentors = [m for m in mentors if repo.group in m.groups]
         repos[repo.name] = repo
 
     return repos
-
-
-
-
-# import os
-# os.chdir("/home/merlijn/PHD/SYSPROG/project/")
-# students = get_students(groups=["project-groep-test"])
-# for student in students:
-#     print(student)
-
-# print()
-# print()
-
-# mentors = get_mentors()
-# for student in mentors:
-#     print(student)
-
-# %%
-
-# %%
