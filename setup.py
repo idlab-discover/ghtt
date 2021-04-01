@@ -36,6 +36,6 @@ setup(
         "Programming Language :: Python :: 3.5",
         "License :: OSI Approved :: GNU Affero General Public License v3",
     ],
-    install_requires=["github3.py", "pygithub", "click", "requests", "jinja2"],
+    install_requires=["github3.py", "pygithub", "click", "requests", "jinja2", "pyyaml", "tabulate"],
     python_requires='>=3.5',
 )

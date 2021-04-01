@@ -2,9 +2,11 @@
 #%%
 import csv
 import re
+from operator import attrgetter
 from typing import List, Dict, Optional
 from urllib.parse import urlparse
 
+import click
 from jinja2 import Template
 import yaml
 
@@ -22,6 +24,17 @@ class Person:
         self.record = {}
         self.group = None
         self.groups = []
+
+    @property
+    def group_sortkey(self):
+        """
+        Helper attribute to help sort the group by number, but falling back to simple sort by name.
+        This is always safe, no matter what the group name is (including nr or not).
+        """
+        nr_part = re.sub(r'[^0-9]', '', self.group)
+        if nr_part:
+            nr_part = ('0'*(5-len(nr_part))) + nr_part
+        return nr_part+self.group
 
     def __str__(self):
         return "Student '{}' ('{}') Group: '{}'  Groups: '{}'  Record: {}".format(
@@ -96,7 +109,7 @@ def get_persons(persons_config: dict, usernames: List[str] = [], groups: List[st
 
 def get_students(usernames: List[str] = [], groups: List[str] = []) -> List[Person]:
     student_config = get("students", None)
-    return get_persons(student_config, usernames, groups)
+    return sorted(get_persons(student_config, usernames, groups), key=attrgetter('group_sortkey', 'username'))
 
 
 def get_mentors(usernames: List[str] = [], groups: List[str] = []) -> List[Person]:
@@ -111,10 +124,12 @@ def get_organization() -> str:
 def get_repos(students: List[Person], mentors: Optional[List[Person]] = None) -> Dict[str, StudentRepo]:
     if mentors is None:
         mentors = []
+    print('get_repos with {} students and {} mentors'.format(len(students), len(mentors)))
     repos = {}
     student_config = get("students", None)
-    if not student_config:
-        return students
+    # if not student_config:
+    # return students  # wrong type
+    assert student_config
     mapping = student_config['field-mapping']
 
     organization = get_organization()
@@ -140,6 +155,7 @@ def get_repos(students: List[Person], mentors: Optional[List[Person]] = None) ->
         repo.organization = organization
         repo.mentors = [m for m in mentors if repo.group in m.groups]
         repos[repo.name] = repo
+
     return repos
 
 
