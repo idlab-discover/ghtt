@@ -342,7 +342,7 @@ def create_issues(ctx, path, yes, students=None, groups=None):
         if not asker.should_proceed(repo.url):
             continue
 
-        click.secho("\n\nGenerating issues in repo {}/{}".format(g_org.html_url, repo.name), fg="green")
+        click.secho("Generating issues in repo {}/{}".format(g_org.html_url, repo.name), fg="green")
 
         for issue_template in issue_templates:
             issue_type = issue_template.get('type')
@@ -476,7 +476,7 @@ def grant(ctx, yes, students=None, groups=None):
     students = ghtt.config.get_students(usernames=students, groups=groups)
     repos = ghtt.config.get_repos(students, mentors=ghtt.config.get_mentors())
 
-    asker = ProceedAsker(yes=yes, action='grant')
+    asker = ProceedAsker(yes=yes, action='give students')
 
     for repo in repos.values():
         try:
@@ -484,10 +484,10 @@ def grant(ctx, yes, students=None, groups=None):
         except UnknownObjectException:
             click.secho("Warning: repository {} not found, skipping".format(repo.url), fg="yellow")
             continue
-        if not asker.should_proceed(repo.url):
+        if not asker.should_proceed('{}" access to "{}'.format('", "'.join([s.username for s in repo.students]), repo.url)):
             continue
 
-        click.secho("Adding the student as collaborator", fg="green")
+        click.secho("Adding students {} as collaborators to {}".format([s.username for s in repo.students], repo.url), fg="green")
         for student in repo.students:
             g_repo.add_to_collaborators(student.username)
 
