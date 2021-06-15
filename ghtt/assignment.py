@@ -211,6 +211,7 @@ def render_template(template: str, clone_url, repo: ghtt.config.StudentRepo) -> 
         group=repo.group,
         students=repo.students,
         mentors=repo.mentors,
+        repo=repo,
     )
 
 
