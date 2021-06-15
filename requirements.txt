@@ -5,4 +5,4 @@ requests
 tabulate
 pyyaml
 jinja2
-natsorted
+natsort
