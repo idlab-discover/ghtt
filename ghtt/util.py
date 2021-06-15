@@ -53,3 +53,5 @@ def branches_to_folders(source):
     for branch in branches:
         subprocess.check_call(["git", "checkout", branch], cwd=source)
         shutil.copytree(source, "{}.expanded/{}".format(source, branch))
+
+    subprocess.check_call(["git", "checkout", "master"], cwd=source)
