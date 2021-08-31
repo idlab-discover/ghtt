@@ -45,6 +45,7 @@ def branches_to_folders(source):
     SOURCE: path to git repository
     """
 
+    source = source.rstrip("/")
     branches = subprocess.check_output(["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/*"], cwd=source, universal_newlines=True)
     branches = branches.strip().split("\n")
 
