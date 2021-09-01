@@ -265,7 +265,13 @@ def create_repos(ctx, source, yes, students=None, groups=None):
         if not asker.should_proceed(repo.url):
             continue
 
-        g_repo = g_org.create_repo(repo.name, private=True)
+        g_repo = g_org.create_repo(
+            repo.name, private=True,
+            has_issues=ghtt.config.get('repos.has-issues', False),
+            has_wiki=ghtt.config.get('repos.has-wiki', False),
+            has_downloads=False,
+            has_projects=False,
+        )
 
         click.secho("\n\nGenerating repo {}/{}".format(g_org.html_url, repo.name), fg="green")
 
@@ -317,13 +323,6 @@ def create_issues(ctx, path, yes, students=None, groups=None):
 
     click.secho("# Creating issues defined in {}...".format(path), fg="green")
 
-    with open(path) as f:
-        issue_templates: Optional[List[Dict]] = yaml.safe_load(f)
-    assert issue_templates is not None
-    assert isinstance(issue_templates, list)
-    assert len(issue_templates) > 0
-    assert isinstance(issue_templates[0], dict)
-
     g: github.Github = ctx.obj['pyg']
     g_org = g.get_organization(ghtt.config.get_organization())
 
@@ -333,6 +332,9 @@ def create_issues(ctx, path, yes, students=None, groups=None):
     repos = _check_repo_groups(yes=yes, repos=repos)
 
     asker = ProceedAsker(yes=yes, action='create the issue(s) for')
+
+    with open(path) as f:
+        issue_template_content = f.read()
 
     for repo in repos.values():
         try:
@@ -345,38 +347,39 @@ def create_issues(ctx, path, yes, students=None, groups=None):
 
         click.secho("Generating issues in repo {}/{}".format(g_org.html_url, repo.name), fg="green")
 
-        for issue_template in issue_templates:
-            issue_type = issue_template.get('type')
+        issue_dicts: Optional[List[Dict]] = yaml.safe_load(render_template(issue_template_content, g_repo.ssh_url, repo))
+        assert issue_dicts is not None
+        assert isinstance(issue_dicts, list)
+        assert len(issue_dicts) > 0
+        assert isinstance(issue_dicts[0], dict)
+
+        for issue_dict in issue_dicts:
+            issue_type = issue_dict.get('type')
 
             if issue_type == 'milestone':
                 try:
                     g_repo.create_milestone(
-                        title=render_template(issue_template.get('title'), g_repo.ssh_url, repo),
-                        description=issue_template.get('description'),
-                        due_on=issue_template.get('due date')
+                        title=issue_dict.get('title'),
+                        description=issue_dict.get('description'),
+                        due_on=issue_dict.get('due date')
                     )
                 except github.GithubException as e:
                     if len(e.data["errors"]) != 1  or e.data["errors"][0]["code"] != "already_exists":
                         raise
-
-
-
             elif issue_type == 'issue':
-                click.secho("Adding issue with title '{}'".format(issue_template.get('title')), fg="green")
+                click.secho("Adding issue with title '{}'".format(issue_dict.get('title')), fg="green")
 
                 # find the milestone, if any
-                milestone = issue_template.get('milestone', github.GithubObject.NotSet)
+                milestone = issue_dict.get('milestone', github.GithubObject.NotSet)
                 if milestone is not github.GithubObject.NotSet:
                     milestone = [ms for ms in g_repo.get_milestones() if ms.title == milestone][0]
 
                 g_repo.create_issue(
-                    title=render_template(issue_template.get('title'), g_repo.ssh_url, repo),
-                    body=render_template(issue_template.get('body'), g_repo.ssh_url, repo),
+                    title=issue_dict.get('title'),
+                    body=issue_dict.get('body'),
                     milestone=milestone,
-                    labels=issue_template.get('labels', []),
-                    assignees=[
-                        render_template(a, g_repo.ssh_url, repo) for a in issue_template.get('assignees', [])
-                    ]
+                    labels=issue_dict.get('labels', []),
+                    assignees=issue_dict.get('assignees', [])
                 )
 
 

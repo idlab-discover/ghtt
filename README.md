@@ -10,6 +10,22 @@ sudo snap install ghtt
 
 > Note: you might need to [install snapd](https://snapcraft.io/docs/installing-snapd), if it's not available on your system.
 
+## `ghtt --help`
+
+```txt
+
+Usage: ghtt [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  assignment
+  search      Searches repositories matching the query, prints the...
+  util
+```
+
+
 ## `ghtt search` helps you search GitHub for uploaded code
 
 ```txt
@@ -36,7 +52,7 @@ Options:
   --help             Show this message and exit.
 ```
 
-## `ghtt update-pr` helps you push code and create a pr to student repositories
+## `ghtt assignment update-pr` helps you push code and create a pr to student repositories
 
 ```txt
 Usage: ghtt update-pr [OPTIONS]
