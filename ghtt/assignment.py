@@ -3,7 +3,7 @@
 from functools import wraps
 import os
 import subprocess
-from datetime import datetime
+from datetime import datetime, date, timezone
 from typing import Optional, List, Dict, Union
 
 import click
@@ -70,7 +70,7 @@ def _check_repo_groups(yes: bool, repos: Dict[str, StudentRepo]) -> Dict[str, St
         if (
                 (expected_group_size and len(repo.students) != expected_group_size)
                 or (expected_mentor_count and len(repo.mentors) != expected_mentor_count)
-           ):
+        ):
             if expected_mentor_count or repo.mentors:
                 click.secho("Group {} has {} students and {} mentors (expected {}/{}):"
                             .format(repo.group, len(repo.students), len(repo.mentors),
@@ -357,30 +357,91 @@ def create_issues(ctx, path, yes, students=None, groups=None):
             issue_type = issue_dict.get('type')
 
             if issue_type == 'milestone':
-                try:
-                    g_repo.create_milestone(
-                        title=issue_dict.get('title'),
-                        description=issue_dict.get('description'),
-                        due_on=issue_dict.get('due date')
-                    )
-                except github.GithubException as e:
-                    if len(e.data["errors"]) != 1  or e.data["errors"][0]["code"] != "already_exists":
-                        raise
-            elif issue_type == 'issue':
-                click.secho("Adding issue with title '{}'".format(issue_dict.get('title')), fg="green")
+                # convert due_on to datetime
+                due_on = issue_dict.get('due date')
+                if isinstance(due_on, str):
+                    from dateutil import parser
+                    due_on = parser.parse(due_on)
+                elif isinstance(due_on, date):
+                    due_on = datetime.combine(due_on, datetime.min.time())
+                assert isinstance(due_on, datetime)
+                # prevent evil naive datetime
+                if due_on.tzinfo is None or due_on.tzinfo.utcoffset(due_on) is None:
+                    from dateutil.tz import tz
+                    due_on = due_on.replace(tzinfo=tz.tzlocal()).astimezone(tz.tzlocal())
+                    assert due_on.tzinfo is not None and due_on.tzinfo.utcoffset(due_on) is not None
 
+                # find existing milestone with same title
+                matching_milestone = [existing_milestone for existing_milestone in g_repo.get_milestones()
+                                      if existing_milestone.title == issue_dict.get('title')]
+                if len(matching_milestone) == 1:
+                    if issue_dict.get('title') == matching_milestone[0].title and \
+                       issue_dict.get('description') == matching_milestone[0].description and \
+                        due_on == matching_milestone[0].due_on.replace(tzinfo=timezone.utc):
+                        click.secho("Skipping up to date milestone '{}'".format(issue_dict.get('title')), fg="green")
+                    else:
+                        click.secho("Updating milestone '{}'".format(issue_dict.get('title')), fg="green")
+                        matching_milestone[0].edit(
+                            title=issue_dict.get('title'),
+                            description=issue_dict.get('description'),
+                            due_on=due_on,
+                        )
+                elif len(matching_milestone) == 0:
+                    click.secho("Adding milestone '{}'".format(issue_dict.get('title')), fg="green")
+                    try:
+                        g_repo.create_milestone(
+                            title=issue_dict.get('title'),
+                            description=issue_dict.get('description'),
+                            due_on=due_on,
+                        )
+                    except github.GithubException as e:
+                        if len(e.data["errors"]) != 1 or e.data["errors"][0]["code"] != "already_exists":
+                            raise
+                else:
+                    # this is normally impossible
+                    click.secho(f"Skipping: There already exist {len(matching_milestone)} milestones "
+                                f"with title '{issue_dict.get('title')}'", fg="red")
+            elif issue_type == 'issue':
                 # find the milestone, if any
                 milestone = issue_dict.get('milestone', github.GithubObject.NotSet)
                 if milestone is not github.GithubObject.NotSet:
                     milestone = [ms for ms in g_repo.get_milestones() if ms.title == milestone][0]
 
-                g_repo.create_issue(
-                    title=issue_dict.get('title'),
-                    body=issue_dict.get('body'),
-                    milestone=milestone,
-                    labels=issue_dict.get('labels', []),
-                    assignees=issue_dict.get('assignees', [])
-                )
+                # find existing issue with same title
+                matching_issue = [existing_issue for existing_issue in g_repo.get_issues()
+                                  if existing_issue.title == issue_dict.get('title')]
+
+                if len(matching_issue) == 1:
+                    same_labels = issue_dict.get('labels').sort() == [l.name for l in matching_issue[0].labels].sort()
+                    same_assignees = set(issue_dict.get('assignees')) == set([l.login for l in matching_issue[0].assignees])
+                    if issue_dict.get('title') == matching_issue[0].title and \
+                       issue_dict.get('body') == matching_issue[0].body and \
+                       same_labels and \
+                       same_assignees and \
+                       issue_dict.get('milestone') == matching_issue[0].milestone.title:
+                        click.secho("Skipping up to date issue '{}'".format(issue_dict.get('title')), fg="green")
+                    else:
+                        click.secho("Updating issue with title '{}'".format(issue_dict.get('title')), fg="green")
+                        matching_issue[0].edit(
+                            title=issue_dict.get('title'),
+                            body=issue_dict.get('body'),
+                            milestone=milestone,
+                            labels=issue_dict.get('labels', []),
+                            assignees=issue_dict.get('assignees', []),
+                            # state=xxx,
+                        )
+                elif len(matching_issue) == 0:
+                    click.secho("Adding issue with title '{}'".format(issue_dict.get('title')), fg="green")
+                    g_repo.create_issue(
+                        title=issue_dict.get('title'),
+                        body=issue_dict.get('body'),
+                        milestone=milestone,
+                        labels=issue_dict.get('labels', []),
+                        assignees=issue_dict.get('assignees', []),
+                    )
+                else:
+                    click.secho(f"Skipping: There already exist {len(matching_issue)} issues "
+                                f"with title '{issue_dict.get('title')}'", fg="red")
 
 
 @assignment.command()
@@ -412,7 +473,7 @@ def pull(ctx, source, yes, students=None, groups=None):
 
     g : github.Github = ctx.obj['pyg']
     g_org = g.get_organization(ghtt.config.get_organization())
-    
+
     students = ghtt.config.get_students(usernames=students, groups=groups)
     repos = ghtt.config.get_repos(students, mentors=ghtt.config.get_mentors())
 
@@ -476,7 +537,7 @@ def grant(ctx, yes, students=None, groups=None):
 
     g : github.Github = ctx.obj['pyg']
     g_org = g.get_organization(ghtt.config.get_organization())
-    
+
     students = ghtt.config.get_students(usernames=students, groups=groups)
     repos = ghtt.config.get_repos(students, mentors=ghtt.config.get_mentors())
 
@@ -521,7 +582,7 @@ def remove_grant(ctx, yes, students=None, groups=None):
 
     g : github.Github = ctx.obj['pyg']
     g_org = g.get_organization(ghtt.config.get_organization())
-    
+
     students = ghtt.config.get_students(usernames=students, groups=groups)
     repos = ghtt.config.get_repos(students, mentors=ghtt.config.get_mentors())
 
