@@ -412,7 +412,7 @@ def create_issues(ctx, path, yes, students=None, groups=None):
                                   if existing_issue.title == issue_dict.get('title')]
 
                 if len(matching_issue) == 1:
-                    same_labels = issue_dict.get('labels').sort() == [l.name for l in matching_issue[0].labels].sort()
+                    same_labels = issue_dict.get('labels', []).sort() == [l.name for l in matching_issue[0].labels].sort()
                     same_assignees = set(issue_dict.get('assignees')) == set([l.login for l in matching_issue[0].assignees])
                     if issue_dict.get('title') == matching_issue[0].title and \
                        issue_dict.get('body') == matching_issue[0].body and \
