@@ -496,7 +496,7 @@ def pull(ctx, source, yes, students=None, groups=None):
                 g_repo = g_org.get_repo(repo.name)
 
                 subprocess.check_call(
-                    ["git", "fetch", g_repo.ssh_url, "master:{}".format(g_repo.name)], cwd=source)
+                    ["git", "fetch", g_repo.ssh_url, "HEAD:{}".format(g_repo.name)], cwd=source)
 
                 # subprocess.check_call(["git", "checkout", g_repo.name], cwd=source)
                 timestamp = subprocess.check_output(["git", "log", g_repo.name, "-1", "--pretty=format:%ct"], cwd=source, universal_newlines=True).rstrip()
