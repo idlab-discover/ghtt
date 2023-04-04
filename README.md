@@ -1,82 +1,46 @@
-# ghtt: helpers scripts for doing teacher stuff on GitHub
+# ghtt: Manage student projects and exams using GitHub
+
+`ghtt` is a tool to help teachers run projects and exams on GitHub.
+
+* Create individual or group repositories, issues and pull requests from templates.
+* Grant and remove students access to individual or group repositories
+* Download students solutions
+* Integrate with Visual Studio Code to periodically submit solutions during exams.
+
+It works both with GitHub.com and private GitHub Enterprise instances.
 
 ## Installation
 
-[ghtt is available from the snap store.](https://snapcraft.io/ghtt)
+> `ghtt` only runs on Linux, but Windows users can install [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) to run Ubuntu on Windows.
 
-```bash
-sudo snap install ghtt
-```
-
-> Note: you might need to [install snapd](https://snapcraft.io/docs/installing-snapd), if it's not available on your system.
-
-## `ghtt --help`
-
-```txt
-
-Usage: ghtt [OPTIONS] COMMAND [ARGS]...
-
-Options:
-  --help  Show this message and exit.
-
-Commands:
-  assignment
-  search      Searches repositories matching the query, prints the...
-  util
-```
-
-
-## `ghtt search` helps you search GitHub for uploaded code
-
-```txt
-Usage: ghtt search [OPTIONS]
-
-  Searches repositories matching the query, prints the matching
-  repositories, name and email address of the last committer, and optionally
-  emails this info using Mailgun.
-
-  for more info on possible query patterns see
-  https://developer.github.com/v3/search/#search-code
-
-  Examples:
-    * `./ghtt search -t "<github-token>" -u github.ugent.be -q "Allkit.h in:path"`
-    * `./ghtt search -t "<github-token>" -u github.ugent.be -q "Allkit.h in:path" --mg-api-key <mailgun-api-key> --mg-domain <mailgun-url> --to <email-address>`
-
-Options:
-  -q, --query TEXT   Query to run. e.g. "Allkit.h in:path"   [required]
-  --mg-api-key TEXT  Mailgun api key.
-  --mg-domain TEXT   Mailgun domain name.
-  --to TEXT          Email address to send alert to.
-  -u, --url TEXT     URL to Github instance. Defaults to github.com.
-  -t, --token TEXT   Github authentication token.
-  --help             Show this message and exit.
-```
-
-## `ghtt assignment update-pr` helps you push code and create a pr to student repositories
-
-```txt
-Usage: ghtt update-pr [OPTIONS]
-
-  Pushes updated code to a new branch on students repositories and creates a
-  pr.
-
-Options:
-  -o, --organization TEXT  Github organization where student repos are located
-                           [required]
-  --branch TEXT            Name of the branch to create in students repos
-                           [required]
-  --title TEXT             Title of the pull request.  [required]
-  --body TEXT              Body of the pull request (the message).  [required]
-  -s, --source TEXT        Source directory
-  -u, --url TEXT           URL to Github instance. Defaults to github.com.
-  -t, --token TEXT         Github authentication token.
-  --help                   Show this message and exit.
-```
-
-## Contributing
-
-How to run the code without installing:
+You can install `ghtt` by downloading the sources and installing it using `pip`.
 
 ```shell
-python3 -m ghtt
+git clone git@github.com:IBCNServices/ghtt.git
+python3 -m pip install ./ghtt
 ```
+
+After this, you can use it on your system!
+
+## Usage
+
+### Authentication
+
+The easiest option for authentication is a [GitHub Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token). That way, you can quickly run commands without having to fill in your username and password.
+
+```shell
+ghtt assignment --token AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA grant
+```
+
+### Project configuration
+
+Each project and exam you manage with `ghtt` needs a "project configuration directory". This directory contains configuration files and templates to use for that project or exam.
+
+This repository includes [a sample project config directory](docs/examples/project-config/).
+
+* `ghtt.yaml` is the main config file for that project. It specifies which GitHub organization to use, the default configuration of the repositories and more.
+* `students.csv` is a CSV file containing the students and (optionally) which groups they're in. The first row of this CSV is expected to contain the column headers. The next rows are the students.
+* `template/` is a GitHub repository that is used as the template for the student repositories.
+* `lab1-assignment.yaml` is an issue template you can use to generate issues.
+
+Each time you execute the `ghtt` command, it will look for the `ghtt.yaml` file in the _current working directory_. So make sure you `cd` to the project config directory before executing `ghtt`.

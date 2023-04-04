@@ -1,0 +1,21 @@
+url: https://github.ugent.be/ghtt-test
+source: ./template
+students:
+  source: "students.csv"
+  field-mapping:
+    # `username` is the column name for the GitHub usernames in the CSV file. If the username
+    # starts with a `#`, that character is stripped from the username.
+    username: Username
+    # `groups` is the column name for the groups in the CSV file. Remove this field
+    # if the project is an individual assignment.
+    group: Projectgroups
+    # `comment` is a jinja2 template to generate the description of the GitHub repository.
+    # The `record` variable contains the contents of the student's row in the CSV file.
+    comment: "{{record['First Name']}} {{record['Last Name']}}"
+# `expected-group-size` and `expected-mentors-per-group` are used for validation. If a
+# group does not conform to this, ghtt will ask for confirmation before creating this group.
+expected-group-size: 2
+expected-mentors-per-group: 0
+repos:
+  has-issues: True
+  has-wiki: False

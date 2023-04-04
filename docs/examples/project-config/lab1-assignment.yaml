@@ -1,0 +1,15 @@
+- type: milestone
+  title: Deadline lab 1
+  due date: 2023-03-09
+  description: Deadline lab 1
+- type: issue
+  title: Assignment lab 1
+  milestone: Deadline lab 1
+  assignees:
+    - mesebrec
+  body: |
+    You can find the assignment for the first lab [here](https://github.ugent.be/sysadmin/project-powershell).
+  
+    The deadline for this project is 2023-03-09 at 09:00.
+    
+    Good luck, have fun and please tag Merlijn Sebrechts (@mesebrec) for any questions you might have about this assignment. You can ask questions in this issue or create a new issue. We speak both Dutch and English.

@@ -414,11 +414,15 @@ def create_issues(ctx, path, yes, students=None, groups=None):
                 if len(matching_issue) == 1:
                     same_labels = issue_dict.get('labels', []).sort() == [l.name for l in matching_issue[0].labels].sort()
                     same_assignees = set(issue_dict.get('assignees')) == set([l.login for l in matching_issue[0].assignees])
+                    same_milestone = (
+                        issue_dict.get('milestone') == matching_issue[0].milestone or
+                        matching_issue[0].milestone is not None and issue_dict.get('milestone') == matching_issue[0].milestone.title
+                    )
                     if issue_dict.get('title') == matching_issue[0].title and \
                        issue_dict.get('body') == matching_issue[0].body and \
                        same_labels and \
                        same_assignees and \
-                       issue_dict.get('milestone') == matching_issue[0].milestone.title:
+                       same_milestone:
                         click.secho("Skipping up to date issue '{}'".format(issue_dict.get('title')), fg="green")
                     else:
                         click.secho("Updating issue with title '{}'".format(issue_dict.get('title')), fg="green")
