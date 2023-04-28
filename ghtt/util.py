@@ -19,10 +19,10 @@ def util():
 @click.argument("path", required="True")
 @click.argument("strings", required="True")
 @click.option(
-    '--csv',
-    help='Use this flag when you want to keep the header of a (csv) file.',
+    '--no-header',
+    help='Use this flag when you want to remove the header of a file.',
     is_flag=True)
-def grep_in(path, strings, csv=False):
+def grep_in(path, strings, no_header=False):
     """Prints each line which contains one of the strings in the provided comma-separated list.
 
     FILENAME: name of file to search
@@ -34,7 +34,7 @@ def grep_in(path, strings, csv=False):
     with open(path, "r") as f:
         lines = f.readlines()
 
-        if csv:
+        if not no_header:
             click.secho(lines.pop(0).strip())
 
         for line in lines:
