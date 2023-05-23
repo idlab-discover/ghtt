@@ -18,7 +18,11 @@ def util():
 @util.command()
 @click.argument("path", required="True")
 @click.argument("strings", required="True")
-def grep_in(path, strings):
+@click.option(
+    '--no-header',
+    help='Use this flag when you want to remove the header of a file.',
+    is_flag=True)
+def grep_in(path, strings, no_header=False):
     """Prints each line which contains one of the strings in the provided comma-separated list.
 
     FILENAME: name of file to search
@@ -30,11 +34,14 @@ def grep_in(path, strings):
     with open(path, "r") as f:
         lines = f.readlines()
 
-    for line in lines:
-        for string in strings:
-            if string in line:
-                click.secho(line.strip())
-                break
+        if not no_header:
+            click.secho(lines.pop(0).strip())
+
+        for line in lines:
+            for string in strings:
+                if string in line:
+                    click.secho(line.strip())
+                    break
 
 
 @util.command()
