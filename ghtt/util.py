@@ -39,20 +39,37 @@ def grep_in(path, strings):
 
 @util.command()
 @click.argument("source", required="True")
-def branches_to_folders(source):
+@click.option(
+    '--at', '-a',
+    help='Time at which to show repository')
+@click.option(
+    '--rm-repo', '-r',
+    help="Use this flag when you only want the files without the repository",
+    is_flag=True)
+def branches_to_folders(source, at=None, rm_repo=False):
     """Expands a git repository so each branch is in a different folder.
 
     SOURCE: path to git repository
     """
-
+    source = os.path.abspath(source)
     source = source.rstrip("/")
     branches = subprocess.check_output(["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/*"], cwd=source, universal_newlines=True)
     branches = branches.strip().split("\n")
 
-    os.mkdir("{}.expanded".format(source))
+    if os.path.exists(f"{source}.expanded"):
+        click.secho(f"ERROR: the path '{source}.expanded' already exists. Please remove that directory first.", fg="red")
+        return(False)
+    os.mkdir(f"{source}.expanded")
+
+    branches.remove("main")
+    branches.remove("master")
 
     for branch in branches:
-        subprocess.check_call(["git", "checkout", branch], cwd=source)
-        shutil.copytree(source, "{}.expanded/{}".format(source, branch))
+        destination = f"{source}.expanded/{branch}"
+        subprocess.check_call(["git", "clone", "--single-branch", "--branch", branch, source, destination])
+        if at:
+            subprocess.check_call(["git", "checkout", f"{branch}@{{{at}}}"], cwd=destination)
+        if rm_repo:
+            shutil.rmtree(f"{destination}/.git")
 
     subprocess.check_call(["git", "checkout", "master"], cwd=source)
