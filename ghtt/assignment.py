@@ -485,6 +485,9 @@ def pull(ctx, source, yes, students=None, groups=None):
 
     asker = ProceedAsker(yes=yes, action='pull')
 
+    # Make sure master is checked out because we can't pull to checked out branch
+    subprocess.check_call(["git", "checkout", "master"], cwd=source)
+
     try:
         for repo in repos.values():
             try:
