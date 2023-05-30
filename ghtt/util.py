@@ -68,9 +68,6 @@ def branches_to_folders(source, at=None, rm_repo=False):
         return(False)
     os.mkdir(f"{source}.expanded")
 
-    branches.remove("main")
-    branches.remove("master")
-
     for branch in branches:
         destination = f"{source}.expanded/{branch}"
         subprocess.check_call(["git", "clone", "--single-branch", "--branch", branch, source, destination])
