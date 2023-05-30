@@ -90,7 +90,7 @@ If you want to grade the solutions, you can download them all using the `pull` c
 ```shell
 # Download all repositories to your local machine
 # These will show up as branches in the template repository
-python3 -m ghtt assignment --token TOKEN pull
+python3 -m ghtt assignment --token $TOKEN pull
 ```
 
 When the `template` repository contains all the student branches, you can turn these branches into folders using the following command.
