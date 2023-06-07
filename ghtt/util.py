@@ -75,7 +75,7 @@ def branches_to_folders(source, at=None, rm_repo=False):
         if at:
             commit = subprocess.check_output(["git", "rev-list", "-n", "1", "--first-parent", f"--before='{at}'", branch], cwd=destination)
             commit = commit.decode(sys.stdout.encoding).rstrip()
-            subprocess.check_call(["git", "checkout", commit], cwd=destination)
+            subprocess.check_call(["git", "-c", "advice.detachedHead=false", "checkout", commit], cwd=destination)
         if rm_repo:
             shutil.rmtree(f"{destination}/.git")
 
