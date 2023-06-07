@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import subprocess
 from functools import wraps
+import sys
 import os
 import shutil
 
@@ -72,7 +73,9 @@ def branches_to_folders(source, at=None, rm_repo=False):
         destination = f"{source}.expanded/{branch}"
         subprocess.check_call(["git", "clone", "--single-branch", "--branch", branch, source, destination])
         if at:
-            subprocess.check_call(["git", "checkout", f"{branch}@{{{at}}}"], cwd=destination)
+            commit = subprocess.check_output(["git", "rev-list", "-n", "1", "--first-parent", f"--before='{at}'", branch], cwd=destination)
+            commit = commit.decode(sys.stdout.encoding).rstrip()
+            subprocess.check_call(["git", "checkout", commit], cwd=destination)
         if rm_repo:
             shutil.rmtree(f"{destination}/.git")
 
