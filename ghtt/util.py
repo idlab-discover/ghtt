@@ -48,13 +48,17 @@ def grep_in(path, strings, no_header=False):
 @util.command()
 @click.argument("source", required="True")
 @click.option(
+    '--branch',
+    help='branch',
+    default='master')
+@click.option(
     '--at', '-a',
     help='Time at which to show repository')
 @click.option(
     '--rm-repo', '-r',
     help="Use this flag when you only want the files without the repository",
     is_flag=True)
-def branches_to_folders(source, at=None, rm_repo=False):
+def branches_to_folders(source, branch, at=None, rm_repo=False):
     """Expands a git repository so each branch is in a different folder.
 
     SOURCE: path to git repository
@@ -79,4 +83,4 @@ def branches_to_folders(source, at=None, rm_repo=False):
         if rm_repo:
             shutil.rmtree(f"{destination}/.git")
 
-    subprocess.check_call(["git", "checkout", "master"], cwd=source)
+    subprocess.check_call(["git", "checkout", branch], cwd=source)

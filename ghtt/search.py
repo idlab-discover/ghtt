@@ -17,7 +17,7 @@ def notify(api_key, domain_name, to, repos, query):
     text = ""
     for g_repo in repos:
         text = text + g_repo.html_url
-        g_commit = g_repo.get_branch("master").commit
+        g_commit = g_repo.get_branch(g_repo.master_branch or "master").commit
         text = text + "\nMetadata of last commit:"
         text = text + "\n\tAuthor name: {}".format(g_commit.commit.author.name)
         text = text + "\n\tAuthor email: {}".format(g_commit.commit.author.email)
@@ -84,7 +84,7 @@ def search(ctx, query, mg_api_key, mg_domain, to):
         click.secho(g_repo.html_url, fg="red")
 
         click.secho("Metadata of last commit:")
-        g_commit = g_repo.get_branch("master").commit
+        g_commit = g_repo.get_branch(g_repo.master_branch or "master").commit
         click.secho("\tAuthor name: {}".format(g_commit.commit.author.name))
         click.secho("\tAuthor email: {}\n".format(g_commit.commit.author.email))
 

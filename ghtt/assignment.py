@@ -172,16 +172,16 @@ def create_pr(ctx, branch, title, body, source, yes, students=None, groups=None,
             continue
 
         if not branch_already_pushed:
-            command = ["git", "push", g_repo.ssh_url, "master:{}".format(branch)]
+            command = ["git", "push", g_repo.ssh_url, f"{g_repo.master_branch or 'master'}:{branch}"]
             cwd = source
             click.secho("\nwill run `{}`\nin directory `{}`.".format(command, cwd))
 
             subprocess.check_call(command, cwd=cwd)
-            pr = g_repo.create_pull(title=title, body=body, base="master", head=branch)
+            pr = g_repo.create_pull(title=title, body=body, base=g_repo.master_branch or 'master', head=branch)
             click.secho("created pull request {}".format(pr.html_url))
         else:
             click.secho("Creating pull request in {}".format(repo.name), fg="green")
-            pr = g_repo.create_pull(title=title, body=body, base="master", head=branch)
+            pr = g_repo.create_pull(title=title, body=body, base=g_repo.master_branch or 'master', head=branch)
             click.secho("created pull request {}".format(pr.html_url))
 
 
@@ -275,7 +275,7 @@ def create_repos(ctx, source, yes, students=None, groups=None):
 
         click.secho("\n\nGenerating repo {}/{}".format(g_org.html_url, repo.name), fg="green")
 
-        subprocess.check_call(["git", "checkout", "master"], cwd=source)
+        subprocess.check_call(["git", "checkout", g_repo.master_branch or 'master'], cwd=source)
         subprocess.call(["git", "branch", "-D", repo.name], cwd=source)
         subprocess.check_call(["git", "checkout", "-b", repo.name], cwd=source)
 
@@ -287,12 +287,12 @@ def create_repos(ctx, source, yes, students=None, groups=None):
         subprocess.check_call(["git", "add", "-A"], cwd=source)
         subprocess.call(["git", "commit", "-m", "fill in templates"], cwd=source)
         click.secho("Pushing source to {}".format(g_repo.ssh_url), fg="green")
-        subprocess.check_call(["git", "push", g_repo.ssh_url, "{}:master".format(repo.name)], cwd=source)
-        subprocess.check_call(["git", "checkout", "master"], cwd=source)
+        subprocess.check_call(["git", "push", g_repo.ssh_url, f"{repo.name}:{g_repo.master_branch or 'master'}"], cwd=source)
+        subprocess.check_call(["git", "checkout", g_repo.master_branch or 'master'], cwd=source)
 
-        click.secho("Protecting the master branch so students can't rewrite history", fg="green")
+        click.secho(f"Protecting the {g_repo.master_branch or 'master'} branch so students can't rewrite history", fg="green")
         g_repo = g_org.get_repo(repo.name)
-        g_master = g_repo.get_branch("master")
+        g_master = g_repo.get_branch(g_repo.master_branch or 'master')
         g_master.edit_protection()
 
         click.secho("Adding comment to repo", fg="green")
@@ -455,6 +455,10 @@ def create_issues(ctx, path, yes, students=None, groups=None):
     help='path to repo with start code',
     default=lambda: ghtt.config.get('source', None))
 @click.option(
+    '--source-branch',
+    help='branch with start code (typically master or main)',
+    default='master')
+@click.option(
     '--students',
     help='Comma-separated list of usernames. Defaults to all students.')
 @click.option(
@@ -463,7 +467,7 @@ def create_issues(ctx, path, yes, students=None, groups=None):
 @click.option(
     '--yes',
     help='Process all students/groups, without confirmation.', is_flag=True)
-def pull(ctx, source, yes, students=None, groups=None):
+def pull(ctx, source, yes, source_branch, students=None, groups=None):
     """Show the latest commit of each student
     """
     if students:
@@ -486,7 +490,7 @@ def pull(ctx, source, yes, students=None, groups=None):
     asker = ProceedAsker(yes=yes, action='pull')
 
     # Make sure master is checked out because we can't pull to checked out branch
-    subprocess.check_call(["git", "checkout", "master"], cwd=source)
+    subprocess.check_call(["git", "checkout", source_branch], cwd=source)
 
     try:
         for repo in repos.values():
