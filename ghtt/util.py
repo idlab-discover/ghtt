@@ -61,7 +61,6 @@ def branches_to_folders(source, at=None, rm_repo=False):
     """
     source = os.path.abspath(source)
     source = source.rstrip("/")
-    # orig_branch = subprocess.check_output(["git", "branch", "--show-current"], cwd=source, universal_newlines=True).strip()
     branches = subprocess.check_output(["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/*"], cwd=source, universal_newlines=True)
     branches = branches.strip().split("\n")
 
@@ -80,6 +79,3 @@ def branches_to_folders(source, at=None, rm_repo=False):
         if rm_repo:
             shutil.rmtree(f"{destination}/.git")
 
-    #### removed: not sure why this was here, we never change the original branch?
-    # # return the original repo to its original branch
-    # subprocess.check_call(["git", "checkout", orig_branch], cwd=source)

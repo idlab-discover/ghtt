@@ -174,16 +174,16 @@ def create_pr(ctx, branch, title, body, source, yes, students=None, groups=None,
             continue
 
         if not branch_already_pushed:
-            command = ["git", "push", g_repo.ssh_url, f"{g_repo.master_branch or default_branch}:{branch}"]
+            command = ["git", "push", g_repo.ssh_url, f"{default_branch}:{branch}"]
             cwd = source
             click.secho("\nwill run `{}`\nin directory `{}`.".format(command, cwd))
 
             subprocess.check_call(command, cwd=cwd)
-            pr = g_repo.create_pull(title=title, body=body, base=g_repo.master_branch or default_branch, head=branch)
+            pr = g_repo.create_pull(title=title, body=body, base=default_branch, head=branch)
             click.secho("created pull request {}".format(pr.html_url))
         else:
             click.secho("Creating pull request in {}".format(repo.name), fg="green")
-            pr = g_repo.create_pull(title=title, body=body, base=g_repo.master_branch or default_branch, head=branch)
+            pr = g_repo.create_pull(title=title, body=body, base=default_branch, head=branch)
             click.secho("created pull request {}".format(pr.html_url))
 
 
@@ -277,24 +277,15 @@ def create_repos(ctx, source, yes, students=None, groups=None):
 
         # dangerous because we use methods with _
         default_branch = ghtt.config.get('default-branch', 'master')
-        if default_branch != 'master':
-            g_repo._master_branch = g_repo._makeStringAttribute(default_branch)
+        g_repo.edit(default_branch=default_branch)
 
         click.secho("\n\nGenerating repo {}/{}".format(g_org.html_url, repo.name), fg="green")
 
         try:
             subprocess.check_call(["git", "checkout", default_branch], cwd=source)
         except subprocess.CalledProcessError:
-            if default_branch == 'master' and ghtt.config.get('default-branch', None) is None:
-                # If "master" doesn't work AND you did not specify a default-branch in the config,
-                # automatically try "main" which is most of the time the correct alternative.
-                default_branch = 'main'
-                subprocess.check_call(["git", "checkout", default_branch], cwd=source)
-                # also set "main" as created branch
-                g_repo._master_branch = g_repo._makeStringAttribute(default_branch)
-                click.secho("\n\"master\" branch does not exists -> successfully used fallback to \"main\" branch", fg="green")
-            else:
-                raise
+            click.secho(f"The branch `{default_branch}` does not exist in the source repository. Please specify the correct source branch in `ghtt.yaml` using the `default-branch` keyword.")
+            raise
         subprocess.call(["git", "branch", "-D", repo.name], cwd=source)
         subprocess.check_call(["git", "checkout", "-b", repo.name], cwd=source)
 
@@ -306,12 +297,12 @@ def create_repos(ctx, source, yes, students=None, groups=None):
         subprocess.check_call(["git", "add", "-A"], cwd=source)
         subprocess.call(["git", "commit", "-m", "fill in templates"], cwd=source)
         click.secho("Pushing source to {}".format(g_repo.ssh_url), fg="green")
-        subprocess.check_call(["git", "push", g_repo.ssh_url, f"{repo.name}:{g_repo.master_branch or default_branch}"], cwd=source)
+        subprocess.check_call(["git", "push", g_repo.ssh_url, f"{repo.name}:{default_branch}"], cwd=source)
         subprocess.check_call(["git", "checkout", default_branch], cwd=source)  # go back to source branch
 
-        click.secho(f"Protecting the {g_repo.master_branch or default_branch} branch so students can't rewrite history", fg="green")
+        click.secho(f"Protecting the {default_branch} branch so students can't rewrite history", fg="green")
         g_repo = g_org.get_repo(repo.name)
-        g_master = g_repo.get_branch(g_repo.master_branch or default_branch)
+        g_master = g_repo.get_branch(default_branch)
         g_master.edit_protection()
 
         click.secho("Adding comment to repo", fg="green")
