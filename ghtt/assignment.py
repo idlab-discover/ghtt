@@ -275,7 +275,6 @@ def create_repos(ctx, source, yes, students=None, groups=None):
             has_projects=False,
         )
 
-        # dangerous because we use methods with _
         default_branch = ghtt.config.get('default-branch', 'master')
         g_repo.edit(default_branch=default_branch)
 
