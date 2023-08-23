@@ -285,6 +285,9 @@ def create_repos(ctx, source, yes, students=None, groups=None):
             subprocess.check_call(["git", "checkout", default_branch], cwd=source)
         except subprocess.CalledProcessError:
             click.secho(f"The branch `{default_branch}` does not exist in the source repository. Please specify the correct source branch in `ghtt.yaml` using the `default-branch` keyword.")
+            if ghtt.config.get('default-branch', None) is None:
+                click.secho(f"\n\nYou typically want to add the \"main\" branch as default in `ghtt.yaml`, like this:")
+                click.secho(f"\ndefault-branch: main", fg="blue")
             raise
         subprocess.call(["git", "branch", "-D", repo.name], cwd=source)
         subprocess.check_call(["git", "checkout", "-b", repo.name], cwd=source)
