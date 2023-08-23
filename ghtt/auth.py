@@ -17,8 +17,8 @@ def authenticate(url, token):
         token = username
         password = click.prompt("{} Password".format(url), hide_input=True)
     else:
-        username = ""
-        password = ""
+        username = None
+        password = None
 
     if not url.startswith("http"):
         url = "https://" + url
