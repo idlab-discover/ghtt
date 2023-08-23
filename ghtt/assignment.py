@@ -162,6 +162,8 @@ def create_pr(ctx, branch, title, body, source, yes, students=None, groups=None,
 
     asker = ProceedAsker(yes=yes, action='create the PR for')
 
+    default_branch = ghtt.config.get('default-branch', 'master')
+
     for repo in repos.values():
         try:
             g_repo = g_org.get_repo(repo.name)
@@ -172,16 +174,16 @@ def create_pr(ctx, branch, title, body, source, yes, students=None, groups=None,
             continue
 
         if not branch_already_pushed:
-            command = ["git", "push", g_repo.ssh_url, f"{g_repo.master_branch or 'master'}:{branch}"]
+            command = ["git", "push", g_repo.ssh_url, f"{g_repo.master_branch or default_branch}:{branch}"]
             cwd = source
             click.secho("\nwill run `{}`\nin directory `{}`.".format(command, cwd))
 
             subprocess.check_call(command, cwd=cwd)
-            pr = g_repo.create_pull(title=title, body=body, base=g_repo.master_branch or 'master', head=branch)
+            pr = g_repo.create_pull(title=title, body=body, base=g_repo.master_branch or default_branch, head=branch)
             click.secho("created pull request {}".format(pr.html_url))
         else:
             click.secho("Creating pull request in {}".format(repo.name), fg="green")
-            pr = g_repo.create_pull(title=title, body=body, base=g_repo.master_branch or 'master', head=branch)
+            pr = g_repo.create_pull(title=title, body=body, base=g_repo.master_branch or default_branch, head=branch)
             click.secho("created pull request {}".format(pr.html_url))
 
 
@@ -222,14 +224,6 @@ def render_template(template: str, clone_url, repo: ghtt.config.StudentRepo) -> 
     help='path to repo with start code',
     default=lambda: ghtt.config.get('source', None))
 @click.option(
-    '--source-branch',
-    help='branch with start code (typically master or main)',
-    default='master')
-@click.option(
-    '--create-repo-branch',
-    help='branch to create on the student repos (typically master or main)',
-    default='master')
-@click.option(
     '--students',
     help='Comma-separated list of usernames. Defaults to all students.')
 @click.option(
@@ -238,7 +232,7 @@ def render_template(template: str, clone_url, repo: ghtt.config.StudentRepo) -> 
 @click.option(
     '--yes',
     help='Process all students/groups, without confirmation.', is_flag=True)
-def create_repos(ctx, source, source_branch, create_repo_branch, yes, students=None, groups=None):
+def create_repos(ctx, source, yes, students=None, groups=None):
     """Create student repositories in the organization specified by the url.
     Each repository will contain a copy of the specified source and will have force-pushing disabled
     so students can not rewrite history.
@@ -282,18 +276,23 @@ def create_repos(ctx, source, source_branch, create_repo_branch, yes, students=N
         )
 
         # dangerous because we use methods with _
-        if create_repo_branch != 'master':
-            g_repo._master_branch = g_repo._makeStringAttribute(create_repo_branch)
+        default_branch = ghtt.config.get('default-branch', 'master')
+        if default_branch != 'master':
+            g_repo._master_branch = g_repo._makeStringAttribute(default_branch)
 
         click.secho("\n\nGenerating repo {}/{}".format(g_org.html_url, repo.name), fg="green")
 
         try:
-            subprocess.check_call(["git", "checkout", source_branch], cwd=source)
+            subprocess.check_call(["git", "checkout", default_branch], cwd=source)
         except subprocess.CalledProcessError:
-            if source_branch == 'master':
-                # assume source branch is main. Will fail is that is also not true
-                source_branch = 'main'
-                subprocess.check_call(["git", "checkout", source_branch], cwd=source)
+            if default_branch == 'master' and ghtt.config.get('default-branch', None) is None:
+                # If "master" doesn't work AND you did not specify a default-branch in the config,
+                # automatically try "main" which is most of the time the correct alternative.
+                default_branch = 'main'
+                subprocess.check_call(["git", "checkout", default_branch], cwd=source)
+                # also set "main" as created branch
+                g_repo._master_branch = g_repo._makeStringAttribute(default_branch)
+                click.secho("\n\"master\" branch does not exists -> successfully used fallback to \"main\" branch", fg="green")
             else:
                 raise
         subprocess.call(["git", "branch", "-D", repo.name], cwd=source)
@@ -307,12 +306,12 @@ def create_repos(ctx, source, source_branch, create_repo_branch, yes, students=N
         subprocess.check_call(["git", "add", "-A"], cwd=source)
         subprocess.call(["git", "commit", "-m", "fill in templates"], cwd=source)
         click.secho("Pushing source to {}".format(g_repo.ssh_url), fg="green")
-        subprocess.check_call(["git", "push", g_repo.ssh_url, f"{repo.name}:{g_repo.master_branch or 'master'}"], cwd=source)
-        subprocess.check_call(["git", "checkout", source_branch], cwd=source)  # go back to source branch
+        subprocess.check_call(["git", "push", g_repo.ssh_url, f"{repo.name}:{g_repo.master_branch or default_branch}"], cwd=source)
+        subprocess.check_call(["git", "checkout", default_branch], cwd=source)  # go back to source branch
 
-        click.secho(f"Protecting the {g_repo.master_branch or 'master'} branch so students can't rewrite history", fg="green")
+        click.secho(f"Protecting the {g_repo.master_branch or default_branch} branch so students can't rewrite history", fg="green")
         g_repo = g_org.get_repo(repo.name)
-        g_master = g_repo.get_branch(g_repo.master_branch or 'master')
+        g_master = g_repo.get_branch(g_repo.master_branch or default_branch)
         g_master.edit_protection()
 
         click.secho("Adding comment to repo", fg="green")
@@ -475,10 +474,6 @@ def create_issues(ctx, path, yes, students=None, groups=None):
     help='path to repo with start code',
     default=lambda: ghtt.config.get('source', None))
 @click.option(
-    '--source-branch',
-    help='branch with start code (typically master or main)',
-    default='master')
-@click.option(
     '--students',
     help='Comma-separated list of usernames. Defaults to all students.')
 @click.option(
@@ -487,7 +482,7 @@ def create_issues(ctx, path, yes, students=None, groups=None):
 @click.option(
     '--yes',
     help='Process all students/groups, without confirmation.', is_flag=True)
-def pull(ctx, source, yes, source_branch, students=None, groups=None):
+def pull(ctx, source, yes, students=None, groups=None):
     """Show the latest commit of each student
     """
     if students:
@@ -510,7 +505,8 @@ def pull(ctx, source, yes, source_branch, students=None, groups=None):
     asker = ProceedAsker(yes=yes, action='pull')
 
     # Make sure master is checked out because we can't pull to checked out branch
-    subprocess.check_call(["git", "checkout", source_branch], cwd=source)
+    default_branch = ghtt.config.get('default-branch', 'master')
+    subprocess.check_call(["git", "checkout", default_branch], cwd=source)
 
     try:
         for repo in repos.values():

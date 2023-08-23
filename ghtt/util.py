@@ -48,23 +48,20 @@ def grep_in(path, strings, no_header=False):
 @util.command()
 @click.argument("source", required="True")
 @click.option(
-    '--branch',
-    help='branch',
-    default='master')
-@click.option(
     '--at', '-a',
     help='Time at which to show repository')
 @click.option(
     '--rm-repo', '-r',
     help="Use this flag when you only want the files without the repository",
     is_flag=True)
-def branches_to_folders(source, branch, at=None, rm_repo=False):
+def branches_to_folders(source, at=None, rm_repo=False):
     """Expands a git repository so each branch is in a different folder.
 
     SOURCE: path to git repository
     """
     source = os.path.abspath(source)
     source = source.rstrip("/")
+    # orig_branch = subprocess.check_output(["git", "branch", "--show-current"], cwd=source, universal_newlines=True).strip()
     branches = subprocess.check_output(["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/*"], cwd=source, universal_newlines=True)
     branches = branches.strip().split("\n")
 
@@ -83,4 +80,6 @@ def branches_to_folders(source, branch, at=None, rm_repo=False):
         if rm_repo:
             shutil.rmtree(f"{destination}/.git")
 
-    subprocess.check_call(["git", "checkout", branch], cwd=source)
+    #### removed: not sure why this was here, we never change the original branch?
+    # # return the original repo to its original branch
+    # subprocess.check_call(["git", "checkout", orig_branch], cwd=source)
