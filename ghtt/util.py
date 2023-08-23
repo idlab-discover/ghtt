@@ -79,4 +79,3 @@ def branches_to_folders(source, at=None, rm_repo=False):
         if rm_repo:
             shutil.rmtree(f"{destination}/.git")
 
-    subprocess.check_call(["git", "checkout", "master"], cwd=source)

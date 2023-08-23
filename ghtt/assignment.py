@@ -162,6 +162,8 @@ def create_pr(ctx, branch, title, body, source, yes, students=None, groups=None,
 
     asker = ProceedAsker(yes=yes, action='create the PR for')
 
+    default_branch = ghtt.config.get('default-branch', 'master')
+
     for repo in repos.values():
         try:
             g_repo = g_org.get_repo(repo.name)
@@ -172,16 +174,16 @@ def create_pr(ctx, branch, title, body, source, yes, students=None, groups=None,
             continue
 
         if not branch_already_pushed:
-            command = ["git", "push", g_repo.ssh_url, "master:{}".format(branch)]
+            command = ["git", "push", g_repo.ssh_url, f"{default_branch}:{branch}"]
             cwd = source
             click.secho("\nwill run `{}`\nin directory `{}`.".format(command, cwd))
 
             subprocess.check_call(command, cwd=cwd)
-            pr = g_repo.create_pull(title=title, body=body, base="master", head=branch)
+            pr = g_repo.create_pull(title=title, body=body, base=default_branch, head=branch)
             click.secho("created pull request {}".format(pr.html_url))
         else:
             click.secho("Creating pull request in {}".format(repo.name), fg="green")
-            pr = g_repo.create_pull(title=title, body=body, base="master", head=branch)
+            pr = g_repo.create_pull(title=title, body=body, base=default_branch, head=branch)
             click.secho("created pull request {}".format(pr.html_url))
 
 
@@ -273,9 +275,19 @@ def create_repos(ctx, source, yes, students=None, groups=None):
             has_projects=False,
         )
 
+        default_branch = ghtt.config.get('default-branch', 'master')
+        g_repo.edit(default_branch=default_branch)
+
         click.secho("\n\nGenerating repo {}/{}".format(g_org.html_url, repo.name), fg="green")
 
-        subprocess.check_call(["git", "checkout", "master"], cwd=source)
+        try:
+            subprocess.check_call(["git", "checkout", default_branch], cwd=source)
+        except subprocess.CalledProcessError:
+            click.secho(f"The branch `{default_branch}` does not exist in the source repository. Please specify the correct source branch in `ghtt.yaml` using the `default-branch` keyword.")
+            if ghtt.config.get('default-branch', None) is None:
+                click.secho(f"\n\nYou typically want to add the \"main\" branch as default in `ghtt.yaml`, like this:")
+                click.secho(f"\ndefault-branch: main", fg="blue")
+            raise
         subprocess.call(["git", "branch", "-D", repo.name], cwd=source)
         subprocess.check_call(["git", "checkout", "-b", repo.name], cwd=source)
 
@@ -287,12 +299,12 @@ def create_repos(ctx, source, yes, students=None, groups=None):
         subprocess.check_call(["git", "add", "-A"], cwd=source)
         subprocess.call(["git", "commit", "-m", "fill in templates"], cwd=source)
         click.secho("Pushing source to {}".format(g_repo.ssh_url), fg="green")
-        subprocess.check_call(["git", "push", g_repo.ssh_url, "{}:master".format(repo.name)], cwd=source)
-        subprocess.check_call(["git", "checkout", "master"], cwd=source)
+        subprocess.check_call(["git", "push", g_repo.ssh_url, f"{repo.name}:{default_branch}"], cwd=source)
+        subprocess.check_call(["git", "checkout", default_branch], cwd=source)  # go back to source branch
 
-        click.secho("Protecting the master branch so students can't rewrite history", fg="green")
+        click.secho(f"Protecting the {default_branch} branch so students can't rewrite history", fg="green")
         g_repo = g_org.get_repo(repo.name)
-        g_master = g_repo.get_branch("master")
+        g_master = g_repo.get_branch(default_branch)
         g_master.edit_protection()
 
         click.secho("Adding comment to repo", fg="green")
@@ -486,7 +498,8 @@ def pull(ctx, source, yes, students=None, groups=None):
     asker = ProceedAsker(yes=yes, action='pull')
 
     # Make sure master is checked out because we can't pull to checked out branch
-    subprocess.check_call(["git", "checkout", "master"], cwd=source)
+    default_branch = ghtt.config.get('default-branch', 'master')
+    subprocess.check_call(["git", "checkout", default_branch], cwd=source)
 
     try:
         for repo in repos.values():
