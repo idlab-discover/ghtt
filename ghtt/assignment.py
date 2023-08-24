@@ -586,10 +586,13 @@ def grant(ctx, yes, students=None, groups=None):
     '--groups',
     help='Comma-separated list of group names. Defaults to all groups.')
 @click.option(
+    '--read-only',
+    help='Instead of removing all access, set repository access to read-only. (Issues can still be created and replied to.)', is_flag=True)
+@click.option(
     '--yes',
     help='Process all students/groups, without confirmation.', is_flag=True)
-def remove_grant(ctx, yes, students=None, groups=None):
-    """Removes students' push access to their repository and cancels any open invitation for that
+def remove_grant(ctx, yes, read_only, students=None, groups=None):
+    """Removes students' access to their repository and cancels any open invitation for that
     student.
     """
     if students:
@@ -627,8 +630,19 @@ def remove_grant(ctx, yes, students=None, groups=None):
                     invitation.invitee, repo.name), fg="green")
                 invitation.delete()
                 g_repo.remove_invitation(invitation.invite_id)
-        # Remove user from collaborators
-        for username in [s.username for s in repo.students]:
-            click.secho("Removing '{}' as collaborators from '{}'".format(
-                username, repo.name), fg="green")
-            g_repo.remove_from_collaborators(username)
+
+        if not read_only:
+            # Remove user from collaborators
+            for username in [s.username for s in repo.students]:
+                click.secho("Removing '{}' as collaborators from '{}'".format(
+                    username, repo.name), fg="green")
+                g_repo.remove_from_collaborators(username)
+        else:
+            # Set Read-only repo access
+            for username in [s.username for s in repo.students]:
+                current_permission = g_repo.get_collaborator_permission(username)
+                click.secho("'{}' currently has '{}' access".format(username, current_permission))
+                if current_permission == 'read':
+                    continue
+                click.secho("Setting repo access to read-only for '{}' in '{}'".format(username, repo.name), fg="green")
+                g_repo.add_to_collaborators(username, 'pull')
