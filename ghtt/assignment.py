@@ -598,6 +598,8 @@ def grant(ctx, yes, read_only, students=None, groups=None):
 def remove_grant(ctx, yes, students=None, groups=None):
     """Removes students' access to their repository and cancels any open invitation for that
     student.
+
+    Hint: to remove only push access, but keep read-only access, use the grant command with --read-only to update the existing permissions.
     """
     if students:
         students = [s.strip() for s in students.split(",")]
