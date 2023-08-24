@@ -640,9 +640,5 @@ def remove_grant(ctx, yes, read_only, students=None, groups=None):
         else:
             # Set Read-only repo access
             for username in [s.username for s in repo.students]:
-                current_permission = g_repo.get_collaborator_permission(username)
-                click.secho("'{}' currently has '{}' access".format(username, current_permission))
-                if current_permission == 'read':
-                    continue
                 click.secho("Setting repo access to read-only for '{}' in '{}'".format(username, repo.name), fg="green")
                 g_repo.add_to_collaborators(username, 'pull')
