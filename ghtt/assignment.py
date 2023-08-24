@@ -541,11 +541,16 @@ def pull(ctx, source, yes, students=None, groups=None):
     '--groups',
     help='Comma-separated list of group names. Defaults to all groups.')
 @click.option(
+    '--read-only',
+    help='Instead of granting push access, give only pull repository access (= read only). Issues can still be created and replied to.', is_flag=True)
+@click.option(
     '--yes',
     help='Process all students/groups, without confirmation.', is_flag=True)
-def grant(ctx, yes, students=None, groups=None):
-    """Grant each student push access (the collaborator role) to their repository in the
+def grant(ctx, yes, read_only, students=None, groups=None):
+    """Grant each student pull/push access (the collaborator role) to their repository in the
     organization specified by the url.
+    If students already have access, this will force set the new access.
+    Thus --read-only will change existing push access to pull access.
     """
     if students:
         students = [s.strip() for s in students.split(",")]
@@ -561,6 +566,8 @@ def grant(ctx, yes, students=None, groups=None):
     students = ghtt.config.get_students(usernames=students, groups=groups)
     repos = ghtt.config.get_repos(students, mentors=ghtt.config.get_mentors())
 
+    permission = 'pull' if read_only else 'push'
+
     asker = ProceedAsker(yes=yes, action='give students')
 
     for repo in repos.values():
@@ -569,12 +576,12 @@ def grant(ctx, yes, students=None, groups=None):
         except UnknownObjectException:
             click.secho("Warning: repository {} not found, skipping".format(repo.url), fg="yellow")
             continue
-        if not asker.should_proceed('{}" access to "{}'.format('", "'.join([s.username for s in repo.students]), repo.url)):
+        if not asker.should_proceed('{}" {} access to "{}'.format('", "'.join([s.username for s in repo.students]), permission, repo.url)):
             continue
 
-        click.secho("Adding students {} as collaborators to {}".format([s.username for s in repo.students], repo.url), fg="green")
+        click.secho("Granting students {} {} access to {}".format([s.username for s in repo.students], permission, repo.url), fg="green")
         for student in repo.students:
-            g_repo.add_to_collaborators(student.username)
+            g_repo.add_to_collaborators(student.username, permission)
 
 
 @assignment.command()
@@ -586,12 +593,9 @@ def grant(ctx, yes, students=None, groups=None):
     '--groups',
     help='Comma-separated list of group names. Defaults to all groups.')
 @click.option(
-    '--read-only',
-    help='Instead of removing all access, set repository access to read-only. (Issues can still be created and replied to.)', is_flag=True)
-@click.option(
     '--yes',
     help='Process all students/groups, without confirmation.', is_flag=True)
-def remove_grant(ctx, yes, read_only, students=None, groups=None):
+def remove_grant(ctx, yes, students=None, groups=None):
     """Removes students' access to their repository and cancels any open invitation for that
     student.
     """
@@ -631,14 +635,8 @@ def remove_grant(ctx, yes, read_only, students=None, groups=None):
                 invitation.delete()
                 g_repo.remove_invitation(invitation.invite_id)
 
-        if not read_only:
-            # Remove user from collaborators
-            for username in [s.username for s in repo.students]:
-                click.secho("Removing '{}' as collaborators from '{}'".format(
-                    username, repo.name), fg="green")
-                g_repo.remove_from_collaborators(username)
-        else:
-            # Set Read-only repo access
-            for username in [s.username for s in repo.students]:
-                click.secho("Setting repo access to read-only for '{}' in '{}'".format(username, repo.name), fg="green")
-                g_repo.add_to_collaborators(username, 'pull')
+        # Remove user from collaborators
+        for username in [s.username for s in repo.students]:
+            click.secho("Removing '{}' as collaborators from '{}'".format(
+                username, repo.name), fg="green")
+            g_repo.remove_from_collaborators(username)
