@@ -276,7 +276,6 @@ def create_repos(ctx, source, yes, students=None, groups=None):
         )
 
         default_branch = ghtt.config.get('default-branch', 'master')
-        g_repo.edit(default_branch=default_branch)
 
         click.secho("\n\nGenerating repo {}/{}".format(g_org.html_url, repo.name), fg="green")
 
@@ -304,6 +303,7 @@ def create_repos(ctx, source, yes, students=None, groups=None):
 
         click.secho(f"Protecting the {default_branch} branch so students can't rewrite history", fg="green")
         g_repo = g_org.get_repo(repo.name)
+        g_repo.edit(default_branch=default_branch)
         g_master = g_repo.get_branch(default_branch)
         g_master.edit_protection()
 
