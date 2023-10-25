@@ -232,7 +232,10 @@ def render_template(template: str, clone_url, repo: ghtt.config.StudentRepo) -> 
 @click.option(
     '--yes',
     help='Process all students/groups, without confirmation.', is_flag=True)
-def create_repos(ctx, source, yes, students=None, groups=None):
+@click.option(
+    '--require-pull-requests',
+    help='Require pull requests to edit the main branch.', is_flag=True)
+def create_repos(ctx, source, yes, require_pull_requests, students=None, groups=None):
     """Create student repositories in the organization specified by the url.
     Each repository will contain a copy of the specified source and will have force-pushing disabled
     so students can not rewrite history.
@@ -305,7 +308,13 @@ def create_repos(ctx, source, yes, students=None, groups=None):
         g_repo = g_org.get_repo(repo.name)
         g_repo.edit(default_branch=default_branch)
         g_master = g_repo.get_branch(default_branch)
-        g_master.edit_protection()
+        # Note: allow_force_pushes=False is default for edit_protection()
+        if require_pull_requests:
+            g_master.edit_protection(
+                required_approving_review_count=0,  # Corresponds to "Require a pull request before merging"
+            )
+        else:
+            g_master.edit_protection()
 
         click.secho("Adding comment to repo", fg="green")
         g_repo.edit(description=repo.comment)
