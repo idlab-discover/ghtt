@@ -306,7 +306,7 @@ def create_repos(ctx, source, yes, students=None, groups=None):
         g_repo.edit(default_branch=default_branch)
         g_master = g_repo.get_branch(default_branch)
         # Note: allow_force_pushes=False is default for edit_protection()
-        require_pull_requests = ghtt.config.get('require-pull-requests', False)
+        require_pull_requests = ghtt.config.get('repos.require-pull-requests', False)
         if require_pull_requests:
             g_master.edit_protection(
                 required_approving_review_count=0,  # Corresponds to "Require a pull request before merging"
