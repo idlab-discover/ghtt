@@ -112,6 +112,13 @@ def get_organization() -> str:
     return urlparse(get("url", None)).path.rstrip("/").rsplit("/", 1)[-1]
 
 
+def make_repo_name(template: str, organisation: str, student_username: str, student_group: Optional[str]) -> str:
+    res = template.replace('{organisation}', organisation).replace('{student_username}', student_username)
+    if student_group:
+        res = res.replace('{student_group}', student_group)
+    return res
+
+
 def get_repos(students: List[Person], mentors: Optional[List[Person]] = None) -> Dict[str, StudentRepo]:
     if mentors is None:
         mentors = []
@@ -130,16 +137,13 @@ def get_repos(students: List[Person], mentors: Optional[List[Person]] = None) ->
             if not student.group:
                 click.secho("{} is not a member of any group; skipping.".format(student.username))
                 continue
-            reponame = "{}-{}".format(
-                organization,
-                student.group
-            )
+            reponame_template = get('repos.name_template', '{organisation}-{student_group}')
+            reponame = make_repo_name(reponame_template, organization, student.username, student.group)
             repo = repos.get(reponame, StudentRepo(reponame))
         else:
-            repo = StudentRepo("{}-{}".format(
-                organization,
-                student.username
-            ))
+            reponame_template = get('repos.name_template', '{organisation}-{student_username}')
+            reponame = make_repo_name(reponame_template, organization, student.username, student.group)
+            repo = StudentRepo(reponame)
         repo.students.append(student)
         repo.group = student.group
         repo.comment = ", ".join([s.comment for s in repo.students])
