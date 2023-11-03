@@ -137,11 +137,11 @@ def get_repos(students: List[Person], mentors: Optional[List[Person]] = None) ->
             if not student.group:
                 click.secho("{} is not a member of any group; skipping.".format(student.username))
                 continue
-            reponame_template = get('repos.name_template', '{organization}-{student_group}')
+            reponame_template = get('repos.name-template', '{organization}-{student_group}')
             reponame = make_repo_name(reponame_template, organization, student.username, student.group)
             repo = repos.get(reponame, StudentRepo(reponame))
         else:
-            reponame_template = get('repos.name_template', '{organization}-{student_username}')
+            reponame_template = get('repos.name-template', '{organization}-{student_username}')
             reponame = make_repo_name(reponame_template, organization, student.username, student.group)
             repo = StudentRepo(reponame)
         repo.students.append(student)

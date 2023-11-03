@@ -19,11 +19,11 @@ expected-mentors-per-group: 0
 repos:
   has-issues: True
   has-wiki: False
-  # name_template can be set to customize the names of the generated repo's.
+  # name-template can be set to customize the names of the generated repo's.
   # The template replaces the following fields:
   #   - {organization}: The current organization
   #   - {student_group}: The group of the current student
   #   - {student_username}: The username of the current student
   # Default when not working with groups: '{organization}-{student_username}'
   # Default when working with groups:     '{organization}-{student_group}'
-  name_template: 'my_custom_text-{student_group}'
+  name-template: 'my_custom_text-{student_group}'
