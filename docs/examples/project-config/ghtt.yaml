@@ -19,3 +19,5 @@ expected-mentors-per-group: 0
 repos:
   has-issues: True
   has-wiki: False
+  # If require-pull-requests is True, students can't commit to the main branch. They need to use a pull request.
+  require-pull-requests: False
