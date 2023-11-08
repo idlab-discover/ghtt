@@ -21,3 +21,11 @@ repos:
   has-wiki: False
   # If require-pull-requests is True, students can't commit to the main branch. They need to use a pull request.
   require-pull-requests: False
+  # name-template can be set to customize the names of the generated repo's.
+  # The template replaces the following fields:
+  #   - {organization}: The current organization
+  #   - {student_group}: The group of the current student
+  #   - {student_username}: The username of the current student
+  # Default when not working with groups: '{organization}-{student_username}'
+  # Default when working with groups:     '{organization}-{student_group}'
+  name-template: 'my_custom_text-{student_group}'
