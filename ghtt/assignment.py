@@ -455,13 +455,16 @@ def create_issues(ctx, path, yes, students=None, groups=None):
                         )
                 elif len(matching_issue) == 0:
                     click.secho("Adding issue with title '{}'".format(issue_dict.get('title')), fg="green")
-                    g_repo.create_issue(
-                        title=issue_dict.get('title'),
-                        body=issue_dict.get('body'),
-                        milestone=milestone,
-                        labels=issue_dict.get('labels', []),
-                        assignees=issue_dict.get('assignees', []),
-                    )
+                    try:
+                        g_repo.create_issue(
+                            title=issue_dict.get('title'),
+                            body=issue_dict.get('body'),
+                            milestone=milestone,
+                            labels=issue_dict.get('labels', []),
+                            assignees=issue_dict.get('assignees', []),
+                        )
+                    except github.GithubException as e:
+                        click.secho("Warning: could not create issue. Do the assignees have access to the repo? Skipping\n{}".format(e), fg="yellow")
                 else:
                     click.secho(f"Skipping: There already exist {len(matching_issue)} issues "
                                 f"with title '{issue_dict.get('title')}'", fg="red")
@@ -588,7 +591,12 @@ def grant(ctx, yes, read_only, students=None, groups=None):
 
         click.secho("Granting students {} {} access to {}".format([s.username for s in repo.students], permission, repo.url), fg="green")
         for student in repo.students:
-            g_repo.add_to_collaborators(student.username, permission)
+            try:
+                g_repo.add_to_collaborators(student.username, permission)
+            except UnknownObjectException as e:
+                click.secho("Warning: {} ({}) does not have a GitHub account, skipping\n{}".format(student.username, student.comment, e), fg="yellow")
+            except github.GithubException as e:
+                click.secho("Warning: could not grant {} ({}), skipping\n{}".format(student.username, student.comment, e), fg="yellow")
 
 
 @assignment.command()
