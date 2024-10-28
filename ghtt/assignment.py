@@ -320,6 +320,51 @@ def create_repos(ctx, source, yes, students=None, groups=None):
 
 @assignment.command()
 @click.pass_context
+@click.option(
+    '--students',
+    help='Comma-separated list of usernames. Defaults to all students.')
+@click.option(
+    '--groups',
+    help='Comma-separated list of group names. Defaults to all groups.')
+def delete_repos(ctx, students=None, groups=None):
+    """Delete student repositories in the organization specified by the url.
+
+    WARNING: this is obviously a dangerous operation!"""
+    yes = False  # --yes has been disabled. Better always be safe with delete.
+
+    if students:
+        students = [s.strip() for s in students.split(",")]
+    if groups:
+        groups = [gr.strip() for gr in groups.split(",")]
+
+    click.secho("# Deleting (!!!) student repositories..", fg="red")
+
+    g : github.Github = ctx.obj['pyg']
+    g_org = g.get_organization(ghtt.config.get_organization())
+
+    students = ghtt.config.get_students(usernames=students, groups=groups)
+    mentors = ghtt.config.get_mentors()
+    repos = ghtt.config.get_repos(students, mentors=mentors)
+    repos = _check_repo_groups(yes=yes, repos=repos)
+
+    asker = ProceedAsker(yes=yes, action='delete the repo')
+
+    for repo in repos.values():
+        try:
+            g_repo = g_org.get_repo(repo.name)
+        except UnknownObjectException:
+            click.secho("Warning: repository {}/{} does not exist; skipping..".format(g_org.html_url, repo.name), fg="yellow")
+            continue
+        if not asker.should_proceed(repo.url):
+            continue
+
+        click.secho("\n\nDeleting repo {}/{}".format(g_org.html_url, repo.name), fg="green")
+
+        g_repo.delete()
+
+
+@assignment.command()
+@click.pass_context
 @click.argument(
     "path",
     required=True)
