@@ -552,10 +552,9 @@ def pull(ctx, source, yes, students=None, groups=None):
     help='New name for repos. This can contain \\1, \\2, ... to match the groups in the regex. Example: "student-\1"')
 @click.option(
     '--yes',
-    help='Process all students/groups, without confirmation.', is_flag=True)
+    help='Process all repositories, without confirmation.', is_flag=True)
 def rename_repo(ctx, yes, match, replace):
-    """Rename organisation repos using regex
-    """
+    """Rename organisation repos using a regex and replacement."""
     pattern = re.compile(match)
 
     click.secho("# Renaming organisation repositories..", fg="green")
