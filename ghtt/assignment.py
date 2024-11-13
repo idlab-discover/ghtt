@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import re
 from functools import wraps
 import os
 import subprocess
@@ -540,6 +540,42 @@ def pull(ctx, source, yes, students=None, groups=None):
     finally:
         summary.sort(key=lambda tup: tup[2])
         click.secho(tabulate(summary, headers=['Username', "Description", 'Last commit time', "Committer info", 'Commit summary']))
+
+
+@assignment.command()
+@click.pass_context
+@click.option(
+    '--match',
+    help='Regex to match repos. Example: "studnt-(.*)"')
+@click.option(
+    '--replace',
+    help='New name for repos. This can contain \\1, \\2, ... to match the groups in the regex. Example: "student-\1"')
+@click.option(
+    '--yes',
+    help='Process all repositories, without confirmation.', is_flag=True)
+def rename_repo(ctx, yes, match, replace):
+    """Rename organisation repos using a regex and replacement."""
+    pattern = re.compile(match)
+
+    click.secho("# Renaming organisation repositories..", fg="green")
+
+    g: github.Github = ctx.obj['pyg']
+    g_org = g.get_organization(ghtt.config.get_organization())
+    g_repos = g_org.get_repos('all')
+
+    asker = ProceedAsker(yes=yes, action='rename repo')
+
+    for g_repo in g_repos:
+        match = pattern.match(g_repo.name)
+        if not match:
+            continue
+
+        replacement = pattern.sub(replace, g_repo.name)
+
+        if not asker.should_proceed(f"{g_repo.url} with name {g_repo.name} to {replacement}"):
+            continue
+
+        g_repo.edit(name=replacement)
 
 
 @assignment.command()
