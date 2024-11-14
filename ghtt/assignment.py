@@ -326,10 +326,27 @@ def create_repos(ctx, source, yes, students=None, groups=None):
 @click.option(
     '--groups',
     help='Comma-separated list of group names. Defaults to all groups.')
-def delete_repos(ctx, students=None, groups=None):
+@click.option(
+    '--destroy-data',
+    help='Confirm that you want to use this command that can destroy data.', is_flag=True)
+def delete_repos(ctx, students=None, groups=None, destroy_data=False):
     """Delete student repositories in the organization specified by the url.
 
     WARNING: this is obviously a dangerous operation!"""
+
+    click.secho("*** This command will delete repositories! ***", fg="red")
+    click.secho("*** It will destroy data irrecoverably! ***", fg="red")
+    click.secho("\nLifesaver: Consider using the command \"ghtt assignment rename-repo\" to rename repos "
+                "instead of deleting them.\n", fg="green")
+
+    if not destroy_data:
+        click.secho("Add the command line option --destroy-data to enable the delete-repos command.")
+        exit(1)
+
+    if not ghtt.config.get("enable-repo-delete", False):
+        click.secho("Add the line \"enable-repo-delete: True\" to your ghtt config to enable the delete-repos command.")
+        exit(1)
+
     yes = False  # --yes has been disabled. Better always be safe with delete.
 
     if students:
