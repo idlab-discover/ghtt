@@ -332,7 +332,7 @@ def create_repos(ctx, source, yes, students=None, groups=None):
 def delete_repos(ctx, students=None, groups=None, destroy_data=False):
     """Delete student repositories in the organization specified by the url.
 
-    WARNING: this is obviously a dangerous operation!"""
+    WARNING: this is obviously a dangerous operation! Consider using the command 'ghtt assignment rename repo' to rename repos instead of deleting them."""
 
     click.secho("*** This command will delete repositories! ***", fg="red")
     click.secho("*** It will destroy data irrecoverably! ***", fg="red")
