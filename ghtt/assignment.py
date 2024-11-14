@@ -354,7 +354,7 @@ def delete_repos(ctx, students=None, groups=None, destroy_data=False):
     if groups:
         groups = [gr.strip() for gr in groups.split(",")]
 
-    click.secho("# Deleting (!!!) student repositories..", fg="red")
+    click.secho("# WARNING! Deleting student repositories. This will permanently remove all code and history of these repositories! For a less destructive way to remove a repository, see 'ghtt assignment rename-repo'.", fg="red")
 
     g : github.Github = ctx.obj['pyg']
     g_org = g.get_organization(ghtt.config.get_organization())
