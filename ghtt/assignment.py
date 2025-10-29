@@ -247,6 +247,10 @@ def create_repos(ctx, source, yes, students=None, groups=None):
     click.secho("# Creating student repositories..", fg="green")
     click.secho("# Source: '{}'".format(source), fg="green")
 
+    if not Path(f"{source}/.git").exists():
+        click.secho("The template source ({}) does not contain a .git repository. Make sure to initialize the template repository.".format(source), fg="red")
+        raise AbortGhtt()
+
     g : github.Github = ctx.obj['pyg']
     g_org = g.get_organization(ghtt.config.get_organization())
 
