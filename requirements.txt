@@ -5,3 +5,4 @@ tabulate
 pyyaml
 jinja2
 natsort
+python-dateutil
