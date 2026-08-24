@@ -1,8 +1,0 @@
-PyGithub
-click
-requests
-tabulate
-pyyaml
-jinja2
-natsort
-python-dateutil

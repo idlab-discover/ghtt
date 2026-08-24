@@ -157,4 +157,10 @@ dmypy.json
 !.vscode/extensions.json
 *.code-workspace
 .idea
+opencode.json
+docs/rewrite-spec.md
+SESSION.md
 
+
+# Tool caches
+.ruff_cache/

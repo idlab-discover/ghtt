@@ -1,0 +1,77 @@
+[project]
+name = "ghtt"
+version = "0.0.1"
+description = "ghtt helps teachers manage courses and exams that use GitHub."
+readme = "README.md"
+requires-python = ">=3.14"
+license = { file = "LICENSE" }
+keywords = ["GitHub"]
+authors = [{ name = "Merlijn Sebrechts", email = "merlijn.sebrechts@ugent.be" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Topic :: Utilities",
+  "Natural Language :: English",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.14",
+  "License :: OSI Approved :: GNU Affero General Public License v3 (AGPLv3)",
+]
+dependencies = [
+  "click>=8.4.2",
+  "jinja2>=3.1.6",
+  "natsort>=8.4.0",
+  "pydantic>=2.13.4",
+  "pygithub>=2.9.1",
+  "python-dateutil>=2.9.0.post0",
+  "pyyaml>=6.0.3",
+  "requests>=2.34.2",
+  "tabulate>=0.10.0",
+  "typer>=0.27.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.411",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-insta>=0.4.1",
+    "ruff>=0.16.3",
+]
+
+[project.urls]
+Homepage = "http://packages.python.org/gh-teacher"
+
+[project.scripts]
+ghtt = "ghtt.__main__:main"
+
+[tool.pytest.ini_options]
+# Live tests need a disposable GitHub organization, so they never run by
+# default. Run them deliberately with `pytest -m live`.
+addopts = "--strict-config --strict-markers -m 'not live'"
+testpaths = ["tests"]
+markers = [
+  "live: runs against a real, disposable GitHub organization",
+]
+
+[tool.coverage.run]
+source = ["ghtt"]
+branch = true
+
+[tool.coverage.report]
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
+
+[tool.ruff]
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.14"
+typeCheckingMode = "standard"

@@ -5,7 +5,7 @@ summary: ghtt helps teachers manage courses and exams that use GitHub.
 description: |
   ghtt helps teachers manage courses and exams that use GitHub.
 
-base: core18
+base: core24
 confinement: strict
 
 apps:
@@ -24,11 +24,8 @@ apps:
 
 parts:
   gh-teacher-tools:
-    plugin: python
-    python-version: python3
+    plugin: uv
     source: .
-    requirements: 
-      - requirements.txt
     build-packages:
       # Dependencies for building `cryptography` on non-amd64 systems.
       - libffi-dev

@@ -1,31 +1,66 @@
+# Example ghtt project configuration.
+#
+# Every setting here can also be given on the command line; this file only saves
+# you from retyping them. Run `ghtt config schema` for the machine-readable
+# schema, and see docs/configuration.md for the full reference.
+
+# The GitHub instance and the organization holding the student repositories.
+# This legacy form ends in the organization; you can also set the instance with
+# `url` and the organization with `--organization`.
 url: https://github.ugent.be/ghtt-test
+
+# The local Git repository with the assignment start code.
 source: ./template
+
+# Branch created in new repositories, and the base branch of pull requests.
+# Set this to `main` if your source repository uses main.
+default-branch: master
+
+# Git transport used to push and fetch: `https` uses your token, `ssh` uses your
+# own SSH keys. Defaults to https.
+transport: https
+
 students:
   source: "students.csv"
   field-mapping:
-    # `username` is the column name for the GitHub usernames in the CSV file. If the username
-    # starts with a `#`, that character is stripped from the username.
+    # `username` is the column name for the GitHub usernames in the CSV file. If
+    # the username starts with a `#`, that character is stripped.
     username: Username
-    # `groups` is the column name for the groups in the CSV file. Remove this field
-    # if the project is an individual assignment.
+    # `group` is the column name for the group of each student. Remove this
+    # field if the project is an individual assignment. Use `groups` instead if
+    # a student can belong to several groups; that column is a comma-separated
+    # list and the student joins every group repository in it.
     group: Projectgroups
-    # `comment` is a jinja2 template to generate the description of the GitHub repository.
-    # The `record` variable contains the contents of the student's row in the CSV file.
+    # `comment` is a jinja2 template that generates that student's part of the
+    # GitHub repository description. `record` holds the student's CSV row.
     comment: "{{record['First Name']}} {{record['Last Name']}}"
-# `expected-group-size` and `expected-mentors-per-group` are used for validation. If a
-# group does not conform to this, ghtt will ask for confirmation before creating this group.
+
+# `expected-group-size` and `expected-mentors-per-group` validate the groups.
+# When a repository does not match, ghtt shows its members and asks whether to
+# continue with that repository. Set a count to 0 to disable its check.
 expected-group-size: 2
 expected-mentors-per-group: 0
+
 repos:
   has-issues: True
   has-wiki: False
-  # If require-pull-requests is True, students can't commit to the main branch. They need to use a pull request.
+  # If require-pull-requests is True, students can't commit to the default
+  # branch. They need to use a pull request.
   require-pull-requests: False
-  # name-template can be set to customize the names of the generated repo's.
-  # The template replaces the following fields:
-  #   - {organization}: The current organization
-  #   - {student_group}: The group of the current student
-  #   - {student_username}: The username of the current student
-  # Default when not working with groups: '{organization}-{student_username}'
-  # Default when working with groups:     '{organization}-{student_group}'
+  # The default branch is always protected so students cannot rewrite the
+  # history they hand in. List additional branches to protect here, by exact
+  # name. Wildcard patterns are not supported; see docs/configuration.md.
+  # protect-branches:
+  #   - solutions
+  # name-template customizes the names of the generated repositories.
+  # It understands the following placeholders:
+  #   - {organization}:     the current organization
+  #   - {student_group}:    the group of the current student
+  #   - {student_username}: the username of the current student
+  # Default without groups: '{organization}-{student_username}'
+  # Default with groups:    '{organization}-{student_group}'
   name-template: 'my_custom_text-{student_group}'
+
+# delete-repos also requires this line before it will delete anything, on top of
+# the --destroy-data option. Consider `ghtt assignment rename-repo` instead.
+# enable-repo-delete: True
