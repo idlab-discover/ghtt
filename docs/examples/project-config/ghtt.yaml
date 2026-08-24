@@ -47,11 +47,9 @@ repos:
   # If require-pull-requests is True, students can't commit to the default
   # branch. They need to use a pull request.
   require-pull-requests: False
-  # The default branch is always protected so students cannot rewrite the
-  # history they hand in. List additional branches to protect here, by exact
-  # name. Wildcard patterns are not supported; see docs/configuration.md.
-  # protect-branches:
-  #   - solutions
+  # Every branch is protected against force pushes and deletion, so students
+  # cannot rewrite the history they hand in. This is not configurable; see
+  # docs/configuration.md.
   # name-template customizes the names of the generated repositories.
   # It understands the following placeholders:
   #   - {organization}:     the current organization

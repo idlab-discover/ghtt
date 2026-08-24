@@ -325,17 +325,7 @@ def assignment(
         bool | None,
         typer.Option(
             "--require-pull-requests/--no-require-pull-requests",
-            help="Require a pull request before merging into a protected branch.",
-        ),
-    ] = None,
-    protect_branch: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--protect-branch",
-            help=(
-                "Additional branch to protect, by exact name. Repeatable. The "
-                "default branch is always protected."
-            ),
+            help="Require a pull request before merging into the default branch.",
         ),
     ] = None,
     students_file: Annotated[
@@ -422,7 +412,6 @@ def assignment(
         has_issues=has_issues,
         has_wiki=has_wiki,
         require_pull_requests=require_pull_requests,
-        protect_branches=tuple(protect_branch or ()),
         students_file=students_file,
         student_username_field=student_username_field,
         student_comment_template=student_comment_template,
@@ -467,8 +456,9 @@ def create_repos(
     """Create a private repository per student or group from a source repository.
 
     Each repository receives a copy of the source with its .jinja files rendered
-    for that student or group, and its default branch is protected so students
-    cannot rewrite history. An existing repository is never overwritten.
+    for that student or group, and every branch is protected so students cannot
+    rewrite or delete the history they hand in. An existing repository is never
+    overwritten.
 
     --content-dir and --content-file add files that live outside the source
     repository, such as a credential or a dataset generated per group. They are

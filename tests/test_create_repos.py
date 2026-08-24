@@ -9,11 +9,8 @@ import pytest
 
 from ghtt.config import Config, RepositoryConfig
 from ghtt.errors import GhttError
-from ghtt.repositories import (
-    BranchProtectionError,
-    create_repositories,
-    validate_protected_branches,
-)
+from ghtt.repositories import create_repositories
+from ghtt.rulesets import HISTORY_RULESET, REVIEW_RULESET
 from ghtt.settings import Settings
 from ghtt.templates import ContentFile, ContentPlan
 
@@ -71,8 +68,39 @@ def test_create_repos_pushes_the_source_and_configures_the_repository(
     assert created.local_path is not None
     assert branches_of(created.local_path) == ["master"]
     assert created.edits == [{"default_branch": "master", "description": "Ada, Bert"}]
-    assert created.branches["master"].protection == {}
     assert report.processed == ("course-team-1",)
+
+
+def test_every_branch_is_protected_by_a_ruleset(tmp_path: Path) -> None:
+    source = make_source(tmp_path)
+    context = make_context(
+        (make_target("course-team-1", students=("ada",)),),
+        settings=settings_for(source),
+        local_root=tmp_path / "remote",
+    )
+
+    create_repositories(context, assume_yes=True, content=ContentPlan())
+
+    created = recorded_organization(context).repositories[0]
+    # No pull request was required, so the review ruleset is not created at all.
+    assert [ruleset["name"] for ruleset in created.rulesets] == [HISTORY_RULESET]
+    history = created.rulesets[0]
+    assert history["enforcement"] == "active"
+    # ~ALL is the whole point: a branch a student creates later is protected too.
+    assert history["conditions"]["ref_name"]["include"] == ["~ALL"]
+    assert {rule["type"] for rule in history["rules"]} == {
+        "non_fast_forward",
+        "deletion",
+    }
+    # A ruleset binds organization owners unless they are excused, and a teacher
+    # must stay able to repair a repository they handed out.
+    assert history["bypass_actors"] == [
+        {
+            "actor_type": "OrganizationAdmin",
+            "actor_id": None,
+            "bypass_mode": "always",
+        }
+    ]
 
 
 def test_templates_are_rendered_per_repository_and_the_source_is_untouched(
@@ -102,7 +130,7 @@ def test_templates_are_rendered_per_repository_and_the_source_is_untouched(
     assert (source / "README.md.jinja").exists()
 
 
-def test_require_pull_requests_is_applied_to_the_protected_branch(
+def test_require_pull_requests_is_applied_to_the_default_branch_only(
     tmp_path: Path,
 ) -> None:
     source = make_source(tmp_path)
@@ -115,9 +143,16 @@ def test_require_pull_requests_is_applied_to_the_protected_branch(
     create_repositories(context, assume_yes=True, content=ContentPlan())
 
     created = recorded_organization(context).repositories[0]
-    assert created.branches["master"].protection == {
-        "required_approving_review_count": 0
-    }
+    assert [ruleset["name"] for ruleset in created.rulesets] == [
+        HISTORY_RULESET,
+        REVIEW_RULESET,
+    ]
+    review = created.rulesets[1]
+    # Scoped to the default branch: a student must stay free to push to a branch
+    # of their own, or the requirement would stop the work instead of reviewing it.
+    assert review["conditions"]["ref_name"]["include"] == ["~DEFAULT_BRANCH"]
+    assert review["rules"][0]["type"] == "pull_request"
+    assert review["rules"][0]["parameters"]["required_approving_review_count"] == 0
 
 
 # ==============================================================================
@@ -171,27 +206,22 @@ def test_a_source_that_is_not_a_repository_is_rejected(tmp_path: Path) -> None:
         create_repositories(context, assume_yes=True, content=ContentPlan())
 
 
-def test_a_wildcard_protection_pattern_is_refused_up_front() -> None:
-    with pytest.raises(BranchProtectionError, match="rulesets"):
-        validate_protected_branches(("release/*",))
-
-
-def test_an_extra_branch_that_does_not_exist_is_reported_not_ignored(
-    tmp_path: Path,
-) -> None:
+def test_a_refused_ruleset_is_reported_not_ignored(tmp_path: Path) -> None:
     source = make_source(tmp_path)
     context = make_context(
         (make_target("course-team-1", students=("ada",)),),
-        settings=settings_for(
-            source, RepositoryConfig(protect_branches=("solutions",))
-        ),
+        settings=settings_for(source),
         local_root=tmp_path / "remote",
     )
+    organization = recorded_organization(context)
+    # A plan that does not allow rulesets on private repositories refuses the
+    # call. The repository exists by then, so the run must not call it a success.
+    organization.refuse_rulesets = {HISTORY_RULESET}
 
     report = create_repositories(context, assume_yes=True, content=ContentPlan())
 
     assert report.processed == ()
-    assert "could not protect solutions" in report.failed[0]
+    assert f"could not apply ruleset {HISTORY_RULESET}" in report.failed[0]
 
 
 def test_dry_run_creates_nothing(tmp_path: Path) -> None:

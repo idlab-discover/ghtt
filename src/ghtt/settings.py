@@ -52,7 +52,6 @@ class CommonOptions(BaseModel):
     has_issues: bool | None = None
     has_wiki: bool | None = None
     require_pull_requests: bool | None = None
-    protect_branches: tuple[str, ...] = ()
     students_file: Path | None = None
     student_username_field: str | None = None
     student_comment_template: str | None = None
@@ -197,7 +196,6 @@ def resolve_settings(options: CommonOptions) -> Settings:
             file_config.repos.require_pull_requests,
             False,
         ),
-        protect_branches=options.protect_branches or file_config.repos.protect_branches,
     )
 
     config = Config(

@@ -33,10 +33,25 @@ class FakeBranch:
     def __init__(self, name: str, commit: FakeCommit) -> None:
         self.name = name
         self.commit = commit
-        self.protection: dict[str, Any] | None = None
 
-    def edit_protection(self, **arguments: Any) -> None:
-        self.protection = arguments
+
+class FakeRequester:
+    """Record the raw API calls ghtt makes for endpoints PyGithub does not model."""
+
+    def __init__(self) -> None:
+        self.posted: list[tuple[str, dict[str, Any]]] = []
+        self.refuse: set[str] = set()
+
+    # The camel case and the `input` name are PyGithub's, not ghtt's: this
+    # stands in for github.Requester.Requester.requestJsonAndCheck.
+    def requestJsonAndCheck(
+        self, verb: str, url: str, input: dict[str, Any] | None = None, **_: Any
+    ) -> tuple[dict[str, Any], Any]:
+        body = input or {}
+        if body.get("name") in self.refuse:
+            raise GithubException(403, "Upgrade required", {})
+        self.posted.append((url, body))
+        return {}, body
 
 
 class FakeRepository:
@@ -49,6 +64,7 @@ class FakeRepository:
     ) -> None:
         self.name = name
         self.full_name = f"{organization}/{name}"
+        self.url = f"https://github.example.edu/api/v3/repos/{organization}/{name}"
         self.html_url = f"https://github.example.edu/{organization}/{name}"
         self.clone_url = f"https://github.example.edu/{organization}/{name}.git"
         self.ssh_url = f"git@github.example.edu:{organization}/{name}.git"
@@ -66,7 +82,15 @@ class FakeRepository:
         self.issues: list[FakeIssue] = []
         self.pulls: list[FakePullRequest] = []
         self.edits: list[dict[str, Any]] = []
+        self.requester = FakeRequester()
         self.request_count = 0
+
+    @property
+    def rulesets(self) -> list[dict[str, Any]]:
+        """Return the ruleset bodies ghtt posted to this repository."""
+        return [
+            body for url, body in self.requester.posted if url.endswith("/rulesets")
+        ]
 
     def back_with_local_repository(self, path: Path) -> None:
         """Point the clone URLs at a real bare repository that Git can push to."""
@@ -258,6 +282,9 @@ class FakeOrganization:
         # When a test sets local_root, a created repository is backed by a real
         # bare repository on disk so a push can be inspected afterwards.
         self.local_root = local_root
+        # Ruleset names every repository created here will refuse, standing in
+        # for a plan that does not allow rulesets on private repositories.
+        self.refuse_rulesets: set[str] = set()
 
     def get_repos(self, type: str = "all") -> list[FakeRepository]:
         self.listings += 1
@@ -266,6 +293,7 @@ class FakeOrganization:
     def create_repo(self, name: str, **arguments: Any) -> FakeRepository:
         self.created.append({"name": name, **arguments})
         repository = FakeRepository(name, organization=self.login)
+        repository.requester.refuse = set(self.refuse_rulesets)
         if self.local_root is not None:
             repository.back_with_local_repository(self.local_root / name)
         self.repositories.append(repository)

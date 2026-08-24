@@ -64,8 +64,7 @@ how Git pushes and fetches.
 | `repos.name-template` | `--repo-name-template` | see below | Pattern for repository names. |
 | `repos.has-issues` | `--has-issues` | `false` | Enable issues on new repositories. |
 | `repos.has-wiki` | `--has-wiki` | `false` | Enable wikis on new repositories. |
-| `repos.require-pull-requests` | `--require-pull-requests` | `false` | Require a pull request before merging into a protected branch. |
-| `repos.protect-branches` | `--protect-branch` | none | Additional branches to protect, by exact name. Repeat the option for more than one. |
+| `repos.require-pull-requests` | `--require-pull-requests` | `false` | Require a pull request before merging into the default branch. |
 | `enable-repo-delete` | `--enable-repo-delete` | `false` | Second opt-in required by `delete-repos`. |
 
 The name template understands three placeholders: `{organization}`,
@@ -74,8 +73,8 @@ before anything is created. Without a template, ghtt uses
 `{organization}-{student_group}` for group work and
 `{organization}-{student_username}` for individual work.
 
-The default branch of a new repository is always protected. `protect-branches`
-adds more. See [Branch protection](#branch-protection) for the limits.
+Every branch of a new repository is protected. See
+[Branch protection](#branch-protection) for what that means and what it needs.
 
 ### Students and mentors
 
@@ -234,11 +233,32 @@ problem is reported. The assignment text is worth more than its assignees.
 
 ## Branch protection
 
-ghtt protects a branch by its exact name, which is what GitHub's branch
-protection API accepts. Wildcard patterns such as `release/*` need GitHub
-repository rulesets, which ghtt cannot configure, so they are **refused** with
-an explanation rather than silently ignored.
+ghtt protects a new repository with GitHub **repository rulesets**, not with
+branch protection rules. A branch protection rule covers one branch that
+already exists, named exactly; a ruleset takes a ref pattern, so one ruleset
+covers every branch, including the ones a student creates later.
 
-A named branch that does not exist in the new repository cannot be protected
-either. ghtt reports that as a failure of that repository, so a run never
-reports success over an unprotected branch.
+`create-repos` installs one ruleset in each repository it creates:
+
+| Ruleset | Branches | Rules |
+| --- | --- | --- |
+| `ghtt-history` | all (`~ALL`) | Block force pushes, block deletion |
+| `ghtt-review` | the default branch | Require a pull request, zero approvals |
+
+`ghtt-review` is created only when `require-pull-requests` is on. It stays on
+the default branch on purpose: requiring a pull request for *every* branch
+would stop students from pushing to a branch of their own.
+
+**Teachers can bypass both rulesets.** Unlike a branch protection rule, a
+ruleset also binds organization owners, so ghtt names `OrganizationAdmin` as a
+bypass actor. Without that, you could not repair a repository you handed out,
+nor even rename its default branch.
+
+Rulesets on **private** repositories need GitHub Pro, Team, or Enterprise
+Cloud, exactly as branch protection did. On a plan that does not allow them,
+GitHub refuses the call, and ghtt reports that repository as failed rather
+than reporting success over an unprotected repository.
+
+The rulesets are installed when a repository is created. ghtt does not
+reconcile them afterwards, so a ruleset you edit or delete by hand stays as you
+left it.

@@ -254,7 +254,7 @@ committing, or pushing anything. It is the cheapest way to find the one group
 your generator skipped:
 
 ```
-would create private repository .../course-team-17 from template, push branch master, and protect master
+would create private repository .../course-team-17 from template, push branch master, and protect every branch
 Warning: no content for course-team-17: Content directory not found: handouts/setup/team-17
 ```
 

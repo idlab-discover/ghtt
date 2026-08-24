@@ -91,8 +91,10 @@ render as an empty string. It is now an error that names the template.
 - `GHTT_TOKEN` as an alternative to `--token`.
 - `--config PATH` to select a config file explicitly.
 - `ghtt config schema` to print the JSON Schema of `ghtt.yaml`.
-- `--protect-branch` and `repos.protect-branches` for branches to protect
-  besides the default branch.
+- Every branch of a new repository is protected against force pushes and
+  deletion, through a repository ruleset rather than a branch protection rule.
+  The legacy tool protected only the default branch, so a student could rewrite
+  or delete any branch they made themselves.
 - `create-pr --content-dir DIR`, which writes just that directory's files into
   each repository, rendered for that student or group, on a branch cut from the
   repository's own default branch. Use it for per-student credentials or to
@@ -111,6 +113,7 @@ render as an empty string. It is now an error that names the template.
 
 ## Known limits
 
-Branch protection applies to branches named exactly. Wildcard patterns such as
-`release/*` require GitHub repository rulesets, which ghtt cannot configure, so
-they are refused with an explanation instead of being silently ignored.
+Branch protection uses repository rulesets, which need GitHub Pro, Team, or
+Enterprise Cloud on private repositories. On a plan that does not allow them,
+GitHub refuses the call and ghtt reports that repository as failed instead of
+reporting success over an unprotected repository.

@@ -55,9 +55,6 @@ class RepositoryConfig(BaseModel):
     has_issues: Annotated[bool, Field(alias="has-issues")] = False
     has_wiki: Annotated[bool, Field(alias="has-wiki")] = False
     require_pull_requests: Annotated[bool, Field(alias="require-pull-requests")] = False
-    # The default branch is always protected. These are additional branches,
-    # named exactly, that should receive the same protection.
-    protect_branches: Annotated[tuple[str, ...], Field(alias="protect-branches")] = ()
 
 
 class Config(BaseModel):
