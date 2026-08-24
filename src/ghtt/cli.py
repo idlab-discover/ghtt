@@ -106,7 +106,13 @@ ConfigPathOption = Annotated[
     Path | None,
     typer.Option(
         "--config",
-        help="Optional ghtt.yaml file. Loaded only when a command needs a value.",
+        envvar="GHTT_CONFIG",
+        help=(
+            "Optional ghtt.yaml file. Loaded only when a command needs a value. "
+            "Give GHTT_CONFIG an absolute path, since a relative one is read "
+            "from whichever directory you run ghtt in."
+        ),
+        show_envvar=True,
     ),
 ]
 UrlOption = Annotated[

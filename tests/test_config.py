@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 import pytest
+from github import Github
 from typer.testing import CliRunner
 
 from ghtt.__main__ import app
@@ -16,6 +18,9 @@ from ghtt.config import (
     load_config,
 )
 
+from .fake_github import FakeGithub, FakeOrganization, FakeRepository
+
+EXAMPLE = Path(__file__).parent.parent / "docs" / "examples" / "project-config"
 runner = CliRunner()
 
 
@@ -92,6 +97,79 @@ students:
 
     with pytest.raises(ConfigError, match="either 'group' or 'groups'"):
         load_config(config_path, current_directory=tmp_path)
+
+
+# ==============================================================================
+# Selecting the config file
+# ==============================================================================
+
+
+def test_the_environment_can_select_the_config_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GHTT_CONFIG lets one course config follow you out of its directory."""
+    organization = FakeOrganization(
+        "ghtt-test",
+        [
+            FakeRepository("my_custom_text-group-1", organization="ghtt-test"),
+            FakeRepository("my_custom_text-group-2", organization="ghtt-test"),
+        ],
+    )
+    monkeypatch.setattr(
+        "ghtt.assignment.connect_github",
+        lambda *_: cast(Github, FakeGithub(organization=organization)),
+    )
+    # A directory with no ghtt.yaml of its own, so only the environment can
+    # supply one.
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GHTT_CONFIG", str(EXAMPLE / "ghtt.yaml"))
+
+    result = runner.invoke(
+        app, ["assignment", "--token", "test-token", "--dry-run", "grant"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "my_custom_text-group-1" in result.output
+    assert "would grant mesebrec push access" in result.output
+
+
+def test_the_command_line_config_overrides_the_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GHTT_CONFIG", str(tmp_path / "from-environment.yaml"))
+
+    result = runner.invoke(
+        app,
+        [
+            "assignment",
+            "--config",
+            str(tmp_path / "from-command-line.yaml"),
+            "--token",
+            "test-token",
+            "grant",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "from-command-line.yaml" in result.output
+    assert "from-environment.yaml" not in result.output
+
+
+def test_a_config_named_by_the_environment_must_exist(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Naming a file is an intention, wherever it was named."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GHTT_CONFIG", str(tmp_path / "missing.yaml"))
+
+    result = runner.invoke(app, ["assignment", "--token", "test-token", "grant"])
+
+    assert result.exit_code == 1
+    assert "Config file not found" in result.output
+    assert "missing.yaml" in result.output
 
 
 def test_schema_exposes_legacy_yaml_names() -> None:

@@ -16,8 +16,12 @@ Each value is taken from the first source that supplies it:
 3. the built-in default documented below
 
 `ghtt` looks for `./ghtt.yaml` only when a command needs a value that was not
-given on the command line. Pass `--config PATH` to select a different file; a
-file named that way must exist, while a missing `./ghtt.yaml` is not an error.
+given on the command line. Pass `--config PATH` to select a different file, or
+set `GHTT_CONFIG` to one absolute path so the same course config is used
+wherever you run `ghtt`; `--config` wins over `GHTT_CONFIG`. A file named
+either way must exist, while a missing `./ghtt.yaml` is not an error. A
+relative `GHTT_CONFIG` is read from whichever directory you run `ghtt` in,
+which defeats the point of setting it, so make it absolute.
 
 Paths inside a config file are resolved relative to that file, not to the
 directory you happen to run `ghtt` from.

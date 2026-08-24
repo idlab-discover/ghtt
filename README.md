@@ -63,8 +63,13 @@ This repository includes [a sample project config directory](docs/examples/proje
 
 `ghtt` looks for `ghtt.yaml` in the _current working directory_, so `cd` to the
 project config directory before running it. You can also point at a specific
-file with `--config`, or skip the file entirely and pass every value on the
-command line.
+file with `--config`, put its absolute path in the `GHTT_CONFIG` environment
+variable to use one config from anywhere, or skip the file entirely and pass
+every value on the command line.
+
+```shell
+export GHTT_CONFIG=/home/you/courses/algorithms-2026/ghtt.yaml
+```
 
 See [docs/configuration.md](docs/configuration.md) for every available setting,
 the template variables, and the issue template format, and

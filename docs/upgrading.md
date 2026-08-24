@@ -89,7 +89,8 @@ render as an empty string. It is now an error that names the template.
 - A typed CLI option for every `ghtt.yaml` setting, so a config file is
   optional. See [configuration.md](configuration.md).
 - `GHTT_TOKEN` as an alternative to `--token`.
-- `--config PATH` to select a config file explicitly.
+- `--config PATH`, or the `GHTT_CONFIG` environment variable, to select a
+  config file explicitly.
 - `ghtt config schema` to print the JSON Schema of `ghtt.yaml`.
 - Every branch of a new repository is protected against force pushes and
   deletion, through a repository ruleset rather than a branch protection rule.

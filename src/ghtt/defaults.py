@@ -13,7 +13,8 @@ from enum import StrEnum
 # ghtt Project Files
 # ==============================================================================
 
-#: Name searched in the current directory when no ``--config`` is supplied.
+#: Name searched in the current directory when neither ``--config`` nor
+#: ``GHTT_CONFIG`` names a file.
 CONFIG_FILENAME = "ghtt.yaml"
 
 #: Suffix marking a file in the source repository as a Jinja template. The

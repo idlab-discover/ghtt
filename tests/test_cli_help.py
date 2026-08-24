@@ -52,6 +52,7 @@ def test_help_never_reads_a_config_file_or_opens_a_socket(
     (tmp_path / "ghtt.yaml").write_text("this: is not: valid yaml\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("GHTT_TOKEN", raising=False)
+    monkeypatch.delenv("GHTT_CONFIG", raising=False)
 
     def refuse_connection(*_: object, **__: object) -> None:
         raise AssertionError("help must not open a network connection")
