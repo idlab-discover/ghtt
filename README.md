@@ -37,6 +37,13 @@ you do not have to repeat it:
 export GHTT_TOKEN=github_pat_11AAAAAAA0aaaaaaaaaaaa
 ```
 
+A fine-grained token owned by the organization needs the repository permissions
+Administration, Contents, Issues, and Pull requests, all read and write, to
+cover every command. See
+[docs/authentication.md](docs/authentication.md) for how to create the token,
+which permissions each command actually uses, and what to check when GitHub
+refuses one.
+
 By default the same token also pushes and fetches over HTTPS, so the token is
 the only thing you have to set up. It is handed to Git one command at a time; it
 is never written into a Git remote, a config file, or an error message.
