@@ -119,7 +119,10 @@ class FakeRepository:
 
     def get_issues(self, state: str = "open") -> list[FakeIssue]:
         self.request_count += 1
-        return [i for i in self.issues if state == "all" or i.state == state]
+        # GitHub's issues endpoint also returns every pull request, as an issue
+        # whose `pull_request` attribute is set.
+        listed = [*self.issues, *(pull.as_issue() for pull in self.pulls)]
+        return [i for i in listed if state == "all" or i.state == state]
 
     def get_pulls(self, state: str = "open", **_: Any) -> list[FakePullRequest]:
         self.request_count += 1
@@ -230,12 +233,14 @@ class FakeIssue:
         milestone: Any,
         labels: list[str],
         assignees: list[str],
+        pull_request: Any = None,
     ) -> None:
         self.title = title
         self.body = body
         self.milestone = milestone
         self.labels = [FakeLabel(label) for label in labels]
         self.assignees = [FakeUser(login) for login in assignees]
+        self.pull_request = pull_request
         self.state = "open"
         self.edits: list[dict[str, Any]] = []
 
@@ -260,6 +265,15 @@ class FakePullRequest:
         self.number = number
         self.state = "open"
         self.html_url = f"{repository.html_url}/pull/{number}"
+        self.issue_view: FakeIssue | None = None
+
+    def as_issue(self) -> FakeIssue:
+        """The pull request as GitHub's issues endpoint lists it."""
+        if self.issue_view is None:
+            self.issue_view = FakeIssue(
+                self.title, self.body, None, [], [], pull_request=self
+            )
+        return self.issue_view
 
 
 class FakeBranchReference:
