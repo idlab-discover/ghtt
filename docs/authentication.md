@@ -10,6 +10,9 @@ Give the token with `--token`, or put it in `GHTT_TOKEN`:
 export GHTT_TOKEN=github_pat_11AAAAAAA0aaaaaaaaaaaa
 ```
 
+To keep the token out of your shell profile and history, see
+[Storing the token](#storing-the-token).
+
 ## Which kind of token
 
 GitHub has two kinds, and `ghtt` works with both.
@@ -123,6 +126,60 @@ On an instance without fine-grained tokens, create a classic token with:
 `repo` is a broad scope: it applies to every repository your account can access,
 including private ones outside the course. Set a short expiration and keep the
 token to the machine you teach from.
+
+## Storing the token
+
+`export GHTT_TOKEN=...` in your shell profile keeps the token in plain text on
+disk, and every program you start from that shell can read it. Store it in your
+operating system's keyring instead, and hand it to `ghtt` only while a command
+runs.
+
+On Linux with GNOME Keyring or KWallet, use `secret-tool` (package
+`libsecret-tools` on Debian and Ubuntu). It prompts for the token, so it never
+lands in your shell history:
+
+```shell
+secret-tool store --label="ghtt token" service ghtt
+```
+
+Then add a wrapper function to `~/.bashrc`:
+
+```shell
+ghtt() { GHTT_TOKEN="$(secret-tool lookup service ghtt)" command ghtt "$@"; }
+```
+
+On macOS, use the Keychain. With `-w` as the last option, `security` prompts for
+the token:
+
+```shell
+security add-generic-password -s ghtt -a "$USER" -w
+ghtt() { GHTT_TOKEN="$(security find-generic-password -s ghtt -w)" command ghtt "$@"; }
+```
+
+### Several organizations
+
+A fine-grained token belongs to a single organization. If you teach several
+courses, you have two options:
+
+- **One classic token** with the `repo` scope works for every organization, but
+  it also reaches everything else your account can access (see
+  [Classic tokens](#classic-tokens)).
+- **One fine-grained token per organization**, each stored in the keyring under
+  the organization's name. The wrapper then picks the token that matches the
+  `ghtt.yaml` in the current directory:
+
+  ```shell
+  secret-tool store --label="ghtt course-2026" service ghtt org course-2026
+
+  ghtt() {
+    local org
+    org=$(sed -n 's|^url: *https\?://[^/]*/\([^/ ]*\).*|\1|p' ghtt.yaml 2>/dev/null)
+    GHTT_TOKEN="$(secret-tool lookup service ghtt org "$org")" command ghtt "$@"
+  }
+  ```
+
+  This assumes `url` in `ghtt.yaml` ends in the organization, and that you run
+  `ghtt` from the directory that holds `ghtt.yaml`.
 
 ## When a command reports a permission problem
 
