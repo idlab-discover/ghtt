@@ -94,6 +94,14 @@ Every branch of a new repository is protected. See
 | `mentors.field-mapping.comment` | `--mentor-comment-template` | Jinja template for a mentor description. |
 | `mentors.field-mapping.groups` | `--mentor-groups-field` | Column holding the groups a mentor guides. |
 
+The username column must hold **GitHub usernames**. A student list exported
+from a learning platform usually holds institutional usernames instead, such as
+a university account or a Microsoft Entra ID login, so convert that column
+first. At Ghent University,
+[student-list-service](https://github.com/idlab-discover/student-list-service)
+replaces the usernames in a Ufora export with the matching github.ugent.be
+usernames.
+
 Set either `group` or `groups`, never both: they describe the same thing in
 incompatible ways, and ghtt refuses a file that sets both rather than guessing.
 
