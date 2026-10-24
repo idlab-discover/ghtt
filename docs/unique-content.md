@@ -258,6 +258,62 @@ would create private repository .../course-team-17 from template, push branch ma
 Warning: no content for course-team-17: Content directory not found: handouts/setup/team-17
 ```
 
+## Recipe: peer review between groups
+
+In a peer review, every group reviews the work of another group. Each group
+needs a different file, the submission it reviews, plus the same feedback
+template and instructions with a deadline. A per-group content directory hands
+out the files, and an issue template hands out the instructions.
+
+Lay out one directory per group with the submission it reviews, and one shared
+directory with the feedback template:
+
+```
+peer-review/common/peer-review/feedback.md
+handouts/peer-review/team-1/peer-review/submission.pdf    # the work of team 3
+handouts/peer-review/team-2/peer-review/submission.pdf    # the work of team 1
+handouts/peer-review/team-3/peer-review/submission.pdf    # the work of team 2
+```
+
+Hand out the files as a pull request:
+
+```shell
+ghtt assignment create-pr \
+  --content-dir peer-review/common \
+  --content-dir 'handouts/peer-review/{student_group}' \
+  --branch peer-review \
+  --title "Peer review" \
+  --body "Adds the submission to review. See the issue 'Peer review' for the instructions."
+```
+
+Then hand out the instructions with an [issue template](configuration.md#issue-templates).
+The template is rendered per repository, so `{{ repo.url }}` links each group to
+its own copy of the files:
+
+```yaml
+- type: milestone
+  title: Peer review
+  due date: 2026-11-14
+  description: Review the submission of another group.
+- type: issue
+  title: Peer review
+  milestone: Peer review
+  body: |
+    1. Merge the pull request **Peer review**.
+    2. Read the submission in [`peer-review`]({{ repo.url }}/tree/main/peer-review).
+    3. Write your feedback in [`peer-review/feedback.md`]({{ repo.url }}/blob/main/peer-review/feedback.md)
+       and push it before the due date of the milestone.
+```
+
+```shell
+ghtt assignment create-issues peer-review.yaml
+```
+
+The links point to the default branch, so they work once the group has merged
+the pull request. After the deadline, `ghtt assignment pull` collects every
+`feedback.md`. Keep your own list of who reviews whom, so you can forward each
+review to the group it is about.
+
 ## What happens when something is missing
 
 A student whose row lacks the column fails on their own, by name, before
