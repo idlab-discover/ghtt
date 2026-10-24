@@ -206,7 +206,10 @@ def apply_entries(
     }
     issues: dict[str, Issue] = {}
     for issue in repository.get_issues(state="all"):
-        issues.setdefault(issue.title, issue)
+        # GitHub lists pull requests as issues too. Skipping them keeps a hand-out
+        # pull request with the same title from being edited instead of the issue.
+        if issue.pull_request is None:
+            issues.setdefault(issue.title, issue)
 
     # Validating references before mutating means a typo in a milestone name
     # cannot leave a repository half updated.

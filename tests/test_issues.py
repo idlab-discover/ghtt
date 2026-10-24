@@ -199,3 +199,20 @@ def test_dry_run_creates_nothing(tmp_path: Path) -> None:
     assert repository.milestones == []
     assert repository.issues == []
     assert report.skipped == ("course-team-1",)
+
+
+def test_a_pull_request_with_the_same_title_is_not_mistaken_for_the_issue(
+    tmp_path: Path,
+) -> None:
+    repository = FakeRepository("course-team-1")
+    pull = repository.create_pull(
+        "Assignment lab 1", "Adds the assignment files.", "main", "lab1"
+    )
+    context = make_context(
+        (make_target("course-team-1", students=("ada",)),), (repository,)
+    )
+
+    create_issues(context, write_template(tmp_path), assume_yes=True)
+
+    assert [issue.title for issue in repository.issues] == ["Assignment lab 1"]
+    assert pull.as_issue().edits == []
