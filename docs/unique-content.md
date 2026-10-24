@@ -97,6 +97,15 @@ exactly the files you handed out and nothing else.
 Check it first with `--dry-run`, which clones and reports which files each
 repository would gain or have replaced, without committing or pushing anything.
 
+**Rerunning is safe.** When `--branch` already exists, ghtt continues that
+branch instead of starting from the default branch. Only the files that changed
+since the last run are committed, and the push updates the open pull request.
+GitHub allows one open pull request per branch, so the open pull request from
+`--branch` is reused, and its title and description are updated when they
+differ from `--title` and `--body`. A repository whose branch already has this content, and
+whose pull request is up to date or no longer open, is skipped. Pass
+`--force-push` to start the branch over from the default branch instead.
+
 ### Paths are relative to the content directory
 
 The content directory mirrors the layout of the student repository, so this:

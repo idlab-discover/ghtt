@@ -15,6 +15,7 @@ from .factories import make_context, make_settings, make_target
 from .fake_github import FakeRepository
 from .local_git import (
     branches_of,
+    commit_count,
     file_in_branch,
     git,
     make_bare_repository,
@@ -134,6 +135,31 @@ def test_an_open_pull_request_is_reused_instead_of_duplicated(tmp_path: Path) ->
     assert len(repository.pulls) == 1
     assert second.processed == ()
     assert second.skipped == ("course-ada",)
+
+
+def test_an_open_pull_request_with_the_same_title_gets_the_new_body(
+    tmp_path: Path,
+) -> None:
+    source = make_repository(tmp_path / "template")
+    repository = student_repository(tmp_path, "course-ada")
+    seed(source, repository)
+    context = context_for(source, (repository,))
+    arguments = {
+        "branch": "lab2",
+        "title": "Lab 2",
+        "body": "Here is lab 2.",
+        "branch_already_pushed": True,
+        "content": ContentPlan(),
+        "force_push": False,
+        "assume_yes": True,
+    }
+
+    create_pull_requests(context, **arguments)
+    second = create_pull_requests(context, **{**arguments, "body": "Corrected."})
+
+    assert len(repository.pulls) == 1
+    assert repository.pulls[0].body == "Corrected."
+    assert second.processed == ("course-ada",)
 
 
 # ==============================================================================
@@ -344,24 +370,96 @@ def test_a_content_dry_run_writes_nothing(tmp_path: Path) -> None:
     assert repository.pulls == []
 
 
-def test_rotating_the_content_needs_force_push(tmp_path: Path) -> None:
-    """Each run branches from the default branch, so a changed hand-out diverges."""
+def test_rerunning_with_changed_content_continues_the_branch(tmp_path: Path) -> None:
+    """A rerun builds on the existing branch, so the push is a fast-forward."""
     source = make_repository(tmp_path / "template")
     repository = student_repository(tmp_path, "course-ada")
     seed(source, repository)
     context = context_for(source, (repository,))
+    bare = Path(repository.clone_url)
 
     first = hand_out(context, content_dir_with(tmp_path, {"KEY.txt": "v1\n"}))
-    rejected = hand_out(context, content_dir_with(tmp_path, {"KEY.txt": "v2\n"}))
+    second = hand_out(context, content_dir_with(tmp_path, {"KEY.txt": "v2\n"}))
+
+    assert first.processed == ("course-ada",)
+    assert second.processed == ("course-ada",)
+    assert second.failed == ()
+    assert len(repository.pulls) == 1
+    assert file_in_branch(bare, "handout", "KEY.txt") == "v2\n"
+    # Both runs are on the branch: the second one only added what changed.
+    assert commit_count(bare, "handout") == commit_count(bare, "master") + 2
+
+
+def test_rerunning_with_the_same_content_changes_nothing(tmp_path: Path) -> None:
+    source = make_repository(tmp_path / "template")
+    repository = student_repository(tmp_path, "course-ada")
+    seed(source, repository)
+    context = context_for(source, (repository,))
+    bare = Path(repository.clone_url)
+    content = content_dir_with(tmp_path, {"KEY.txt": "v1\n"})
+
+    hand_out(context, content)
+    commits = commit_count(bare, "handout")
+    rerun = hand_out(context, content)
+
+    assert rerun.skipped == ("course-ada",)
+    assert rerun.failed == ()
+    assert commit_count(bare, "handout") == commits
+    assert len(repository.pulls) == 1
+
+
+def test_a_rerun_with_new_text_updates_the_open_pull_request(tmp_path: Path) -> None:
+    """Unchanged files still bring the title and description up to date."""
+    source = make_repository(tmp_path / "template")
+    repository = student_repository(tmp_path, "course-ada")
+    seed(source, repository)
+    context = context_for(source, (repository,))
+    bare = Path(repository.clone_url)
+    content = content_dir_with(tmp_path, {"KEY.txt": "v1\n"})
+
+    hand_out(context, content)
+    commits = commit_count(bare, "handout")
+    rerun = hand_out(context, content, title="Hand-out v2", body="new body")
+
+    assert rerun.processed == ("course-ada",)
+    assert len(repository.pulls) == 1
+    assert repository.pulls[0].title == "Hand-out v2"
+    assert repository.pulls[0].body == "new body"
+    assert commit_count(bare, "handout") == commits
+
+
+def test_unchanged_content_opens_no_new_pull_request(tmp_path: Path) -> None:
+    """A merged and closed hand-out is not proposed again."""
+    source = make_repository(tmp_path / "template")
+    repository = student_repository(tmp_path, "course-ada")
+    seed(source, repository)
+    context = context_for(source, (repository,))
+    content = content_dir_with(tmp_path, {"KEY.txt": "v1\n"})
+
+    hand_out(context, content)
+    repository.pulls[0].state = "closed"
+    rerun = hand_out(context, content, body="new body")
+
+    assert rerun.skipped == ("course-ada",)
+    assert len(repository.pulls) == 1
+    assert repository.pulls[0].edits == []
+
+
+def test_force_push_starts_the_branch_over(tmp_path: Path) -> None:
+    source = make_repository(tmp_path / "template")
+    repository = student_repository(tmp_path, "course-ada")
+    seed(source, repository)
+    context = context_for(source, (repository,))
+    bare = Path(repository.clone_url)
+
+    hand_out(context, content_dir_with(tmp_path, {"KEY.txt": "v1\n"}))
     forced = hand_out(
         context, content_dir_with(tmp_path, {"KEY.txt": "v2\n"}), force_push=True
     )
 
-    assert first.processed == ("course-ada",)
-    assert rejected.failed == ("course-ada: push was rejected",)
     assert forced.processed == ("course-ada",)
-    assert len(repository.pulls) == 1
-    assert file_in_branch(Path(repository.clone_url), "handout", "KEY.txt") == "v2\n"
+    assert file_in_branch(bare, "handout", "KEY.txt") == "v2\n"
+    assert commit_count(bare, "handout") == commit_count(bare, "master") + 1
 
 
 # ==============================================================================

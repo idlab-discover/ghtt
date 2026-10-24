@@ -505,7 +505,11 @@ def create_pr(
         bool,
         typer.Option(
             "--force-push",
-            help="Overwrite the branch if it already exists with other history.",
+            help=(
+                "Overwrite the branch if it already exists with other history. "
+                "With --content-dir or --content-file, start the branch over from "
+                "the default branch instead of continuing it."
+            ),
         ),
     ] = False,
     students: StudentsFilterOption = None,
@@ -521,7 +525,8 @@ def create_pr(
     rendered for that student or group, on a branch cut from the repository's
     own default branch. Use it to hand out per-student credentials, a file only
     one group may have, or a correction to one file without touching anything
-    else the student has changed. This mode needs no --source.
+    else the student has changed. This mode needs no --source. When --branch
+    already exists, it is continued: rerunning commits only what changed.
 
     The pull request is opened from --branch into the default branch. An open
     pull request for the same branch pair is reused rather than duplicated:

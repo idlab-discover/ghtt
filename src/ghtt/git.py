@@ -151,6 +151,23 @@ def clone_remote_branch(
     )
 
 
+def remote_branch_exists(
+    remote_url: str,
+    branch: str,
+    working_directory: Path,
+    transport: GitTransport,
+    token: str | None,
+) -> bool:
+    """Report whether a remote repository has a branch, without fetching it."""
+    result = run_git(
+        ["ls-remote", "--heads", remote_url, f"refs/heads/{branch}"],
+        working_directory,
+        transport,
+        token,
+    )
+    return bool(result.stdout.strip())
+
+
 def commit_all(repository: Path, message: str) -> bool:
     """Commit every change in a working copy and report whether anything changed."""
     run_git(["add", "-A"], repository)
