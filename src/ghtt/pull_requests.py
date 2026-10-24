@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+from enum import Enum
 from pathlib import Path
 
 import typer
@@ -16,6 +17,7 @@ from .git import (
     commit_all,
     list_local_branches,
     push_branch,
+    remote_branch_exists,
 )
 from .github import clone_url_for, explain_github_error
 from .prompt import Confirmer
@@ -52,7 +54,8 @@ def create_pull_requests(
     The content mode branches from each repository's own default branch and
     writes only the files of the content plan into it, resolved and rendered for
     that target. That is what keeps a hand-out from carrying anything else along,
-    and it needs no access to the source repository or its history.
+    and it needs no access to the source repository or its history. Rerunning it
+    continues the existing branch, so only what changed is committed.
     """
     settings = context.settings
     default_branch = settings.config.default_branch
@@ -122,21 +125,17 @@ def create_pull_requests(
             continue
 
         clone_url = clone_url_for(repository, settings.transport)
+        # A push updates an open pull request by itself, so it counts as acting
+        # on the target even when no pull request is opened or edited.
+        pushed = False
+        content_unchanged = False
         try:
             if not content.is_empty:
                 changed = apply_content(
                     context, target, clone_url, content, branch, title, force_push
                 )
-                if changed is None:
-                    typer.secho(
-                        f"{target.name} already has this content; nothing to do.",
-                        fg=typer.colors.YELLOW,
-                    )
-                    skipped.append(target.name)
-                    continue
-                if settings.dry_run:
-                    skipped.append(target.name)
-                    continue
+                content_unchanged = changed is None
+                pushed = not content_unchanged and not settings.dry_run
             elif source is not None:
                 typer.secho(
                     f"Pushing {default_branch} to {target.name}:{branch}",
@@ -151,6 +150,7 @@ def create_pull_requests(
                     settings.git_token,
                     force=force_push,
                 )
+                pushed = True
         except RenderError as error:
             # The plan itself is sound, so this is one target's own file that is
             # missing or unreadable: the other repositories still get theirs.
@@ -167,7 +167,7 @@ def create_pull_requests(
             typer.secho(
                 f"Warning: could not push to {target.name}: {error}\n"
                 "If the branch already exists with different history, rerun with "
-                "--force-push to overwrite it.",
+                "--force-push to start it over from the default branch.",
                 fg=typer.colors.YELLOW,
                 err=True,
             )
@@ -175,8 +175,18 @@ def create_pull_requests(
             continue
 
         try:
-            opened = open_pull_request(
-                repository, target, branch, title, body, default_branch
+            # Unchanged content leaves nothing new to review, so only an open pull
+            # request is brought up to date; none is opened for it. A dry run has
+            # already announced the pull request it would open.
+            outcome = open_pull_request(
+                repository,
+                target,
+                branch,
+                title,
+                body,
+                default_branch,
+                may_create=not content_unchanged and not settings.dry_run,
+                dry_run=settings.dry_run,
             )
         except GithubException as error:
             explained = explain_github_error(
@@ -186,12 +196,16 @@ def create_pull_requests(
             failed.append(f"{target.name}: {explained}")
             continue
 
-        # Pushing to the branch of an existing pull request updates that pull
-        # request, so the target was still acted on even though no new one was
-        # opened. Only a run that did neither has nothing to report.
-        if opened or source is not None or not content.is_empty:
+        if settings.dry_run:
+            skipped.append(target.name)
+        elif pushed or outcome is not PullRequestOutcome.UNCHANGED:
             processed.append(target.name)
         else:
+            if content_unchanged:
+                typer.secho(
+                    f"{target.name} already has this content; nothing to do.",
+                    fg=typer.colors.YELLOW,
+                )
             skipped.append(target.name)
 
     return TargetReport(
@@ -212,15 +226,22 @@ def apply_content(
 
     The branch is cut from the repository's **own** default branch, so the pull
     request contains exactly these files and nothing the student has since
-    changed elsewhere. Returns the files written, or ``None`` when the
-    repository already holds this content.
+    changed elsewhere. When the branch already exists, it is continued instead:
+    a rerun then commits only what changed and pushes a fast-forward.
+    ``force_push`` starts the branch over from the default branch. Returns the
+    files written, or ``None`` when the repository already holds this content.
     """
     settings = context.settings
     with tempfile.TemporaryDirectory(prefix="ghtt-") as directory:
         workspace = Path(directory) / target.name
+        start = settings.config.default_branch
+        if not force_push and remote_branch_exists(
+            clone_url, branch, Path(directory), settings.transport, settings.git_token
+        ):
+            start = branch
         clone_remote_branch(
             clone_url,
-            settings.config.default_branch,
+            start,
             workspace,
             settings.transport,
             settings.git_token,
@@ -260,6 +281,14 @@ def apply_content(
     return changes
 
 
+class PullRequestOutcome(Enum):
+    """What happened to the pull request of one repository."""
+
+    CREATED = "created"
+    UPDATED = "updated"
+    UNCHANGED = "unchanged"
+
+
 def open_pull_request(
     repository: Repository,
     target: RepositoryTarget,
@@ -267,27 +296,48 @@ def open_pull_request(
     title: str,
     body: str,
     base_branch: str,
-) -> bool:
-    """Open a pull request unless an open one already covers this branch pair.
+    may_create: bool = True,
+    dry_run: bool = False,
+) -> PullRequestOutcome:
+    """Open a pull request, or bring the open one for this branch up to date.
 
-    Returns whether a new pull request was created. Pushing to the branch of an
-    existing pull request already updates it, so opening a second one would only
-    split the same review in two.
+    GitHub allows one open pull request per branch pair, so the branch is what
+    identifies it. Pushing to that branch already updates its commits; its title
+    and description are edited when they differ from the requested ones.
     """
-    for existing in repository.get_pulls(state="open", base=base_branch):
-        if existing.head.ref == branch:
-            typer.secho(
-                f"Pull request {existing.html_url} already exists for "
-                f"{branch} -> {base_branch}; it was updated by the push.",
-                fg=typer.colors.YELLOW,
-            )
-            return False
-
-    pull_request = repository.create_pull(
-        title=title, body=body, base=base_branch, head=branch
+    existing = next(
+        (
+            pull
+            for pull in repository.get_pulls(state="open", base=base_branch)
+            if pull.head.ref == branch
+        ),
+        None,
     )
+
+    if existing is None:
+        if not may_create:
+            return PullRequestOutcome.UNCHANGED
+        pull_request = repository.create_pull(
+            title=title, body=body, base=base_branch, head=branch
+        )
+        typer.secho(
+            f"Created pull request {pull_request.html_url} for {target.name}",
+            fg=typer.colors.GREEN,
+        )
+        return PullRequestOutcome.CREATED
+
+    if existing.title == title and (existing.body or "") == body:
+        typer.secho(
+            f"Skipping up-to-date pull request '{title}' ({existing.html_url})",
+            fg=typer.colors.GREEN,
+        )
+        return PullRequestOutcome.UNCHANGED
+    if dry_run:
+        typer.echo(f"would update pull request '{title}' ({existing.html_url})")
+        return PullRequestOutcome.UNCHANGED
     typer.secho(
-        f"Created pull request {pull_request.html_url} for {target.name}",
+        f"Updating pull request '{title}' ({existing.html_url})",
         fg=typer.colors.GREEN,
     )
-    return True
+    existing.edit(title=title, body=body)
+    return PullRequestOutcome.UPDATED

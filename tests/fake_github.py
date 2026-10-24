@@ -244,6 +244,11 @@ class FakeIssue:
 
 
 class FakePullRequest:
+    def edit(self, **arguments: Any) -> None:
+        self.edits.append(arguments)
+        self.title = arguments.get("title", self.title)
+        self.body = arguments.get("body", self.body)
+
     def __init__(
         self,
         title: str,
@@ -257,6 +262,7 @@ class FakePullRequest:
         self.body = body
         self.base = FakeBranchReference(base)
         self.head = FakeBranchReference(head)
+        self.edits: list[dict[str, Any]] = []
         self.number = number
         self.state = "open"
         self.html_url = f"{repository.html_url}/pull/{number}"
